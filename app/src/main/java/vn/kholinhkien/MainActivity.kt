@@ -72,6 +72,8 @@ fun InventoryApp() {
     val scope = rememberCoroutineScope()
     val parts by dao.parts().collectAsState(initial = emptyList())
     val movements by dao.movements().collectAsState(initial = emptyList())
+    // Mã được đánh dấu đã sử dụng khi đã có ít nhất một giao dịch xuất kho.
+    val usedCodes = remember(movements) { movements.asSequence().filter { it.type == "XUẤT" }.map { it.code }.toSet() }
     var tab by remember { mutableStateOf(0) }
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<Part?>(null) }
@@ -110,7 +112,7 @@ fun InventoryApp() {
     }
     var batchCodes by remember { mutableStateOf("") }
     var showBatch by remember { mutableStateOf(false) }
-    val filtered = parts.filter { it.name.contains(query, true) || it.code.contains(query, true) || it.note.contains(query, true) }
+    val filtered = parts.filter { !(it.trackingMode == "SINGLE" && it.quantity <= 0 && usedCodes.contains(it.code)) && (it.name.contains(query, true) || it.code.contains(query, true) || it.note.contains(query, true)) }
     Scaffold(
         topBar = {
             TopAppBarCompat(title = when(tab) { 0 -> "Kho linh kiện"; 1 -> "Lịch sử giao dịch"; else -> "Công cụ & sao lưu" },
@@ -138,6 +140,10 @@ fun InventoryApp() {
                         items(filtered, key = { it.id }) { p ->
                             Card(Modifier.fillMaxWidth().clickable { selected = p }) {
                                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    if (usedCodes.contains(p.code)) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = "QR đã sử dụng", tint = androidx.compose.ui.graphics.Color(0xFF2E7D32), modifier = Modifier.size(24.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                    }
                                     Column(Modifier.weight(1f)) {
                                         Text(p.name, style = MaterialTheme.typography.titleMedium)
                                         Text("Mã: ${p.code}", style = MaterialTheme.typography.bodySmall)
@@ -181,7 +187,7 @@ fun InventoryApp() {
                                 newParts.add(Part(code=o.getString("code"), name=o.optString("name"), quantity=o.optInt("quantity"),
                                     minQuantity=o.optInt("minQuantity"), unit=o.optString("unit", "cái"),
                                     photoPath=restorePhotoFromBase64(context, o.optString("photoBase64"), o.optString("photoPath")),
-                                    note=o.optString("note"), updatedAt=o.optLong("updatedAt", System.currentTimeMillis())))
+                                    note=o.optString("note"), updatedAt=o.optLong("updatedAt", System.currentTimeMillis()), trackingMode=o.optString("trackingMode", "SINGLE")))
                             }
                             val newMoves = mutableListOf<Movement>()
                             val ma = root.optJSONArray("movements") ?: JSONArray()
@@ -215,9 +221,21 @@ fun InventoryApp() {
         }
     })
     selected?.let { p ->
-        PartDialog(p, onDismiss = { selected = null }, onEdit = { pendingPhotoPath = p.photoPath; showEdit = true }, onMove = { type, amount, reason, machine ->
+        PartDialog(p, onDismiss = { selected = null }, onEdit = { pendingPhotoPath = p.photoPath; showEdit = true }, onDelete = {
             scope.launch {
-                try { dao.changeStock(p.code, type, amount, reason, machine); message = "Đã cập nhật tồn kho" }
+                try {
+                    dao.deletePartByCode(p.code)
+                    selected = null
+                    message = "Đã xóa mã QR khỏi danh mục. Lịch sử giao dịch vẫn được giữ."
+                } catch (e: Exception) { message = "Không xóa được mã: ${e.message}" }
+            }
+        }, onMove = { type, amount, reason, machine ->
+            scope.launch {
+                try {
+                    dao.changeStock(p.code, type, amount, reason, machine)
+                    message = "Đã cập nhật tồn kho"
+                    if (type == "XUẤT" && p.trackingMode == "SINGLE") selected = null
+                }
                 catch (e: Exception) { message = e.message ?: "Không thể cập nhật" }
             }
         }, onGenerateQr = {
@@ -296,12 +314,18 @@ fun SummaryCard(title: String, value: String, modifier: Modifier = Modifier) {
 @Composable
 fun AddPartDialog(initialCode: String, photoPath: String, onChoosePhoto: () -> Unit, onTakePhoto: () -> Unit, onDismiss: () -> Unit, onSave: (Part) -> Unit) {
     var code by remember(initialCode) { mutableStateOf(initialCode) }; var name by remember { mutableStateOf("") }
-    var qty by remember { mutableStateOf("0") }; var min by remember { mutableStateOf("0") }
+    var qty by remember { mutableStateOf("1") }; var min by remember { mutableStateOf("0") }
     var unit by remember { mutableStateOf("cái") }; var note by remember { mutableStateOf("") }
+    var trackingMode by remember { mutableStateOf("SINGLE") }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Thêm linh kiện") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedTextField(code, { code = it.trim() }, label = { Text("Mã QR / mã linh kiện *") }, singleLine = true)
             OutlinedTextField(name, { name = it }, label = { Text("Tên linh kiện *") }, singleLine = true)
+            Text("Cách quản lý mã QR", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = trackingMode == "SINGLE", onClick = { trackingMode = "SINGLE"; if ((qty.toIntOrNull() ?: 0) > 1) qty = "1" }, label = { Text("Linh kiện lẻ (1 mã/1 món)") })
+                FilterChip(selected = trackingMode == "BULK", onClick = { trackingMode = "BULK" }, label = { Text("Nhiều món/1 mã") })
+            }
             OutlinedTextField(qty, { qty = it.filter(Char::isDigit) }, label = { Text("Số lượng ban đầu") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             OutlinedTextField(min, { min = it.filter(Char::isDigit) }, label = { Text("Ngưỡng cảnh báo tồn") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             OutlinedTextField(unit, { unit = it }, label = { Text("Đơn vị (cái, mét...)") }, singleLine = true)
@@ -312,34 +336,44 @@ fun AddPartDialog(initialCode: String, photoPath: String, onChoosePhoto: () -> U
             }
             if (photoPath.isNotBlank()) Text("Đã lưu ảnh linh kiện", color = MaterialTheme.colorScheme.primary)
         } },
-        confirmButton = { TextButton(enabled = code.isNotBlank() && name.isNotBlank(), onClick = { onSave(Part(code = code, name = name, quantity = qty.toIntOrNull() ?: 0, minQuantity = min.toIntOrNull() ?: 0, unit = unit.ifBlank { "cái" }, note = note)) }) { Text("Lưu") } },
+        confirmButton = { TextButton(enabled = code.isNotBlank() && name.isNotBlank(), onClick = { onSave(Part(code = code, name = name, quantity = qty.toIntOrNull() ?: 0, minQuantity = min.toIntOrNull() ?: 0, unit = unit.ifBlank { "cái" }, note = note, trackingMode = trackingMode)) }) { Text("Lưu") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } })
 }
 
 @Composable
-fun PartDialog(p: Part, onDismiss: () -> Unit, onEdit: () -> Unit, onMove: (String, Int, String, String) -> Unit, onGenerateQr: () -> Unit) {
+fun PartDialog(p: Part, onDismiss: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit, onMove: (String, Int, String, String) -> Unit, onGenerateQr: () -> Unit) {
     var amount by remember { mutableStateOf("1") }; var reason by remember { mutableStateOf("Bảo trì") }; var machine by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("XUẤT") }
+    var confirmDelete by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(p.name) },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Mã: ${p.code}"); Text("Tồn hiện tại: ${p.quantity} ${p.unit}")
+            Text("Mã: ${p.code}")
+            Text("Chế độ: ${if (p.trackingMode == "SINGLE") "Linh kiện lẻ · 1 mã/1 món" else "Nhiều món dùng chung 1 mã"}")
+            Text("Tồn hiện tại: ${p.quantity} ${p.unit}")
             if (p.photoPath.isNotBlank() && File(p.photoPath).exists()) {
                 val bmp = remember(p.photoPath) { BitmapFactory.decodeFile(p.photoPath) }
                 if (bmp != null) Image(bmp.asImageBitmap(), contentDescription = "Ảnh linh kiện", modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp))
             }
-            OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text("Sửa thông tin / ảnh") }
+            OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text("Sửa thông tin / ảnh / chế độ QR") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = type == "XUẤT", onClick = { type = "XUẤT" }, label = { Text("Xuất dùng") })
+                FilterChip(selected = type == "XUẤT", onClick = { type = "XUẤT"; amount = "1" }, label = { Text("Xuất dùng") })
                 FilterChip(selected = type == "NHẬP", onClick = { type = "NHẬP" }, label = { Text("Nhập kho") })
                 FilterChip(selected = type == "KIỂM KÊ", onClick = { type = "KIỂM KÊ" }, label = { Text("Kiểm kê") })
             }
-            OutlinedTextField(amount, { amount = it.filter(Char::isDigit) }, label = { Text(if (type == "KIỂM KÊ") "Số lượng thực tế (có thể bằng 0)" else "Số lượng") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+            if (type == "XUẤT" && p.trackingMode == "SINGLE") Text("Linh kiện lẻ: xuất 1 lần sẽ được ẩn khỏi danh sách tồn kho. Lịch sử vẫn được giữ.", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(amount, { amount = it.filter(Char::isDigit) }, label = { Text(if (type == "KIỂM KÊ") "Số lượng thực tế (có thể bằng 0)" else "Số lượng") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, enabled = !(type == "XUẤT" && p.trackingMode == "SINGLE"))
             OutlinedTextField(reason, { reason = it }, label = { Text("Lý do") }, singleLine = true)
             OutlinedTextField(machine, { machine = it }, label = { Text("Mã máy / cửa hàng") }, singleLine = true)
             OutlinedButton(onClick = onGenerateQr, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCode, null); Spacer(Modifier.width(8.dp)); Text("Tạo / lưu ảnh QR cho mã này") }
+            HorizontalDivider()
+            OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Icon(Icons.Default.Delete, null); Spacer(Modifier.width(8.dp)); Text("Xóa mã QR khỏi danh mục") }
         } },
-        confirmButton = { TextButton(onClick = { onMove(type, amount.toIntOrNull() ?: 0, reason, machine) }) { Text("Xác nhận $type") } },
+        confirmButton = { TextButton(enabled = (amount.toIntOrNull() ?: 0) > 0 || type == "KIỂM KÊ", onClick = { onMove(type, amount.toIntOrNull() ?: 0, reason, machine) }) { Text("Xác nhận $type") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Đóng") } })
+    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Xóa mã QR?") },
+        text = { Text("Mã ${p.code} sẽ bị xóa khỏi danh sách linh kiện. Lịch sử giao dịch sẽ được giữ lại, nhưng mã này không còn dùng để quét nhập/xuất cho đến khi được thêm lại.") },
+        confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Xóa mã") } },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Hủy") } })
 }
 
 @Composable
@@ -348,10 +382,16 @@ fun EditPartDialog(part: Part, photoPath: String, onChoosePhoto: () -> Unit, onT
     var min by remember(part.id) { mutableStateOf(part.minQuantity.toString()) }
     var unit by remember(part.id) { mutableStateOf(part.unit) }
     var note by remember(part.id) { mutableStateOf(part.note) }
+    var trackingMode by remember(part.id) { mutableStateOf(part.trackingMode) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Sửa linh kiện") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Mã QR: ${part.code} (không thay đổi mã)")
             OutlinedTextField(name, { name = it }, label = { Text("Tên linh kiện") }, singleLine = true)
+            Text("Cách quản lý mã QR", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = trackingMode == "SINGLE", onClick = { trackingMode = "SINGLE" }, label = { Text("Linh kiện lẻ") })
+                FilterChip(selected = trackingMode == "BULK", onClick = { trackingMode = "BULK" }, label = { Text("Nhiều món/1 mã") })
+            }
             OutlinedTextField(min, { min = it.filter(Char::isDigit) }, label = { Text("Ngưỡng cảnh báo") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             OutlinedTextField(unit, { unit = it }, label = { Text("Đơn vị") }, singleLine = true)
             OutlinedTextField(note, { note = it }, label = { Text("Ghi chú") })
@@ -362,7 +402,7 @@ fun EditPartDialog(part: Part, photoPath: String, onChoosePhoto: () -> Unit, onT
             if (photoPath.isNotBlank()) Text("Đã lưu ảnh linh kiện", color = MaterialTheme.colorScheme.primary)
             Text("Dùng nút Kiểm kê trong màn hình linh kiện để cập nhật số lượng thực tế và lưu lịch sử chênh lệch.", style = MaterialTheme.typography.bodySmall)
         } },
-        confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { onSave(part.copy(name=name, minQuantity=min.toIntOrNull() ?: 0, unit=unit.ifBlank { "cái" }, note=note)) }) { Text("Lưu") } },
+        confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { onSave(part.copy(name=name, minQuantity=min.toIntOrNull() ?: 0, unit=unit.ifBlank { "cái" }, note=note, trackingMode=trackingMode)) }) { Text("Lưu") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } })
 }
 
@@ -395,7 +435,7 @@ fun ToolsScreen(parts: List<Part>, movements: List<Movement>, onBatch: () -> Uni
             root.put("version", 1)
             root.put("parts", JSONArray().apply { parts.forEach { p -> put(JSONObject().apply {
                 put("code", p.code); put("name", p.name); put("quantity", p.quantity); put("minQuantity", p.minQuantity)
-                put("unit", p.unit); put("photoPath", p.photoPath); put("photoBase64", encodePhotoBase64(p.photoPath)); put("note", p.note); put("updatedAt", p.updatedAt)
+                put("unit", p.unit); put("photoPath", p.photoPath); put("photoBase64", encodePhotoBase64(p.photoPath)); put("note", p.note); put("updatedAt", p.updatedAt); put("trackingMode", p.trackingMode)
             }) } })
             root.put("movements", JSONArray().apply { movements.forEach { m -> put(JSONObject().apply {
                 put("code", m.code); put("partName", m.partName); put("type", m.type); put("amount", m.amount)

@@ -2,6 +2,7 @@ package vn.kholinhkien
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "parts", indices = [Index(value = ["code"], unique = true)])
@@ -14,7 +15,9 @@ data class Part(
     val unit: String = "cái",
     val photoPath: String = "",
     val note: String = "",
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // SINGLE = một món/mã; BULK = nhiều món dùng chung một mã QR
+    val trackingMode: String = "SINGLE"
 )
 
 @Entity(tableName = "movements")
@@ -49,6 +52,8 @@ interface InventoryDao {
     suspend fun addMovement(movement: Movement)
     @Query("DELETE FROM movements")
     suspend fun clearMovements()
+    @Query("DELETE FROM parts WHERE code = :code")
+    suspend fun deletePartByCode(code: String)
     @Query("DELETE FROM parts")
     suspend fun clearParts()
     @Insert
@@ -68,6 +73,10 @@ interface InventoryDao {
             if (type == "KIỂM KÊ") "Số lượng kiểm kê không được âm" else "Số lượng phải lớn hơn 0"
         }
         val part = byCode(code) ?: error("Không tìm thấy mã linh kiện: $code")
+        if (type == "XUẤT" && part.trackingMode == "SINGLE") {
+            require(amount == 1) { "Linh kiện lẻ chỉ được xuất từng 1 món" }
+            require(part.quantity > 0) { "Linh kiện lẻ này đã xuất hoặc đã hết tồn" }
+        }
         val after = when (type) {
             "NHẬP" -> part.quantity + amount
             "XUẤT" -> part.quantity - amount
@@ -80,13 +89,19 @@ interface InventoryDao {
     }
 }
 
-@Database(entities = [Part::class, Movement::class], version = 1, exportSchema = false)
+@Database(entities = [Part::class, Movement::class], version = 2, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): InventoryDao
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE parts ADD COLUMN trackingMode TEXT NOT NULL DEFAULT 'SINGLE'")
+            }
+        }
         @Volatile private var INSTANCE: AppDb? = null
         fun get(context: Context): AppDb = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDb::class.java, "kho-linh-kien.db")
+                .addMigrations(MIGRATION_1_2)
                 .build().also { INSTANCE = it }
         }
     }

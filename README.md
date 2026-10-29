@@ -1,40 +1,38 @@
-# Kho Linh Kiện Android
+# Kho Linh Kiện Android — mã nguồn phiên bản hoàn thiện chức năng chính
 
-## GitHub Actions: tự biên dịch APK từ mã nguồn trong repository
+Ứng dụng Android native, ưu tiên offline, lưu cơ sở dữ liệu Room cục bộ trên điện thoại.
 
-Workflow `.github/workflows/android.yml` dùng `actions/checkout` để lấy **mã nguồn đã upload trực tiếp lên repository này**, rồi chạy `gradle assembleDebug`. Bạn không cần máy tính cài Android Studio để build; chỉ cần tạo repository và bật GitHub Actions.
+## Chức năng có trong mã nguồn
+- Danh sách tồn kho, tìm kiếm theo tên/mã/ghi chú, cảnh báo tồn thấp.
+- Quét QR bằng camera; QR có sẵn phải chứa chính xác mã linh kiện.
+- Thêm linh kiện, chụp ảnh bằng camera hoặc chọn ảnh có sẵn.
+- Tạo ảnh QR PNG cho từng mã; nhập mã hàng loạt và tự sinh ảnh QR.
+- OCR ảnh danh sách mã: trích xuất chuỗi 10 ký tự chữ/số để người dùng rà soát trước khi tạo.
+- Nhập kho, xuất dùng, kiểm kê số lượng thực tế (cho phép tồn bằng 0); giao dịch được ghi vào lịch sử.
+- Sửa tên, đơn vị, ghi chú và ngưỡng tồn.
+- Xuất tệp Excel `.xlsx` có hai trang `Tồn kho` và `Lịch sử`.
+- Sao lưu/khôi phục JSON, có kèm ảnh linh kiện nếu mỗi ảnh dưới 8 MB; khôi phục yêu cầu xác nhận và thay thế dữ liệu hiện tại.
 
-### Cách đưa dự án lên GitHub bằng trình duyệt điện thoại
+## Mở và chạy
+1. Giải nén ZIP trên máy tính.
+2. Cài Android Studio phiên bản ổn định hiện hành, JDK 17 và Android SDK 35.
+3. Mở thư mục `KhoLinhKienAndroid` bằng Android Studio, chờ Gradle tải thư viện.
+4. Nếu Android Studio báo thiếu Gradle Wrapper, tạo/import Gradle project bằng Android Studio hoặc thêm Gradle Wrapper tương thích với Gradle 8.9.
+5. Kết nối điện thoại Android, bật Developer options/USB debugging nếu chạy qua USB, rồi nhấn Run.
+6. Cấp quyền camera khi quét QR. Không cần tài khoản hoặc Internet để sử dụng sau khi thư viện đã được tải và cài app.
 
-1. Tải ZIP mã nguồn và giải nén bằng ứng dụng quản lý tệp trên điện thoại.
-2. Vào https://github.com và đăng nhập.
-3. Nhấn `+` → `New repository`.
-4. Đặt tên `KhoLinhKienAndroid`, chọn `Private` nếu muốn giữ mã nguồn riêng, rồi tạo repository.
-5. Mở thư mục `KhoLinhKienAndroid` đã giải nén. Trong repository, upload **toàn bộ nội dung bên trong thư mục này**, không upload nguyên thư mục lồng bên ngoài. Phải có `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`, thư mục `app/` và `.github/workflows/android.yml` ở ngay thư mục gốc của repository.
-6. Nếu giao diện GitHub trên điện thoại không hiện `Add file` → `Upload files`, bật `Desktop site` trong menu trình duyệt. Nếu upload thư mục `.github` khó trên điện thoại, tạo file workflow thủ công:
-   - Vào repository → `Add file` → `Create new file`.
-   - Đặt tên: `.github/workflows/android.yml`
-   - Dán nội dung file `android.yml` trong mã nguồn đã tải.
-   - Commit file.
-7. Mở tab `Actions`, chọn workflow `Build Android APK`, nhấn `Run workflow` nếu workflow chưa tự chạy. Đợi job xanh `Success`.
-8. Mở lần chạy mới nhất, kéo xuống `Artifacts`, tải `KhoLinhKien-debug-apk`. Giải nén artifact ZIP để lấy `app-debug.apk`.
-9. Chuyển APK về điện thoại và mở để cài. Android có thể yêu cầu cho phép cài ứng dụng từ nguồn này. Chỉ cài APK do workflow repository của chính bạn tạo ra.
+## Quy tắc và lưu ý
+- Mã tạo hàng loạt chỉ nhận chuỗi đúng 10 ký tự chữ/số. QR quét sẵn có thể mang mã khác định dạng và vẫn được tra cứu theo đúng nội dung quét.
+- OCR có thể nhầm `O/0`, `I/1`, `B/8`; phải rà soát trước khi xác nhận tạo.
+- QR sinh ra chứa nguyên văn mã linh kiện; in tem QR nên kiểm tra quét thử trước khi dán.
+- Tồn kho ban đầu được ghi thành giao dịch `ĐẦU KỲ`; nhập/xuất/kiểm kê ghi lịch sử và không cho xuất vượt tồn.
+- Khôi phục JSON sẽ thay thế dữ liệu hiện có; hãy sao lưu trước.
+- Ảnh trên 8 MB không được nhúng vào JSON sao lưu để tránh tệp quá lớn; ảnh đó cần sao lưu riêng.
+- Đây là mã nguồn đã hoàn thiện chức năng chính nhưng **chưa được biên dịch hoặc kiểm thử trên thiết bị thật trong môi trường tạo tệp này**. Cần chạy Gradle build và thử camera/QR/OCR/Excel/khôi phục trước khi dùng làm sổ kho chính. Chưa cung cấp APK đã ký.
 
-### Nếu build thất bại
-- Mở `Actions` → lần chạy thất bại → chọn job `build` → đọc bước màu đỏ và gửi ảnh hoặc sao chép log lỗi để xử lý.
-- Workflow đang dùng Gradle 8.9 và Java 17, phù hợp với Android Gradle Plugin 8.7.3 trong dự án.
-- GitHub Actions build APK debug để cài thử, không phải APK phát hành đã ký.
 
-## Tính năng trong mã nguồn
-- Kho offline cục bộ bằng Room.
-- Tìm kiếm mã/tên linh kiện, QR camera.
-- Tạo QR PNG theo mã, nhập mã hàng loạt và OCR ảnh chuỗi 10 ký tự.
-- Chụp/chọn ảnh linh kiện.
-- Nhập, xuất, kiểm kê, cảnh báo tồn và lịch sử giao dịch.
-- Xuất XLSX hai trang: Tồn kho và Lịch sử.
-- Sao lưu/khôi phục JSON có xác nhận; sao lưu ảnh nhỏ hơn 8 MB kèm theo.
-
-## Lưu ý quan trọng
-- Đây là mã nguồn cần build và kiểm thử thực tế. Workflow chỉ báo build thành công/thất bại; nó không thay thế kiểm thử camera, QR, OCR, sao lưu/khôi phục trên điện thoại.
-- OCR có thể nhầm `O/0`, `I/1`, `B/8`; hãy rà soát mã trước khi tạo.
-- Sao lưu JSON trước khi khôi phục vì thao tác khôi phục thay thế dữ liệu trên máy.
+## Phiên bản 1.2 – chế độ QR linh kiện
+- Mặc định linh kiện lẻ: 1 mã QR cho 1 món; khi xuất 1 món, mã được ẩn khỏi danh sách tồn kho nhưng giao dịch vẫn được giữ trong lịch sử.
+- Có thể chọn chế độ nhiều món dùng chung một mã QR; xuất kho trừ theo số lượng và mã vẫn hiển thị khi tồn về 0.
+- Có nút xóa mã QR riêng kèm xác nhận; chỉ xóa khỏi danh mục, không xóa lịch sử giao dịch.
+- Cơ sở dữ liệu nâng từ v1 lên v2 bằng migration, thêm cột chế độ QR và giữ dữ liệu đã có.
