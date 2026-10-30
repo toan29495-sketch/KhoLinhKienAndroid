@@ -429,22 +429,71 @@ fun ToolsScreen(parts: List<Part>, movements: List<Movement>, onBatch: () -> Uni
             onMessage("Đã xuất tệp Excel XLSX gồm 2 trang: Tồn kho và Lịch sử.")
         } catch (e: Exception) { onMessage("Xuất Excel thất bại: ${e.message}") }
     }
+    val scope = rememberCoroutineScope()
     val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if (uri != null) try {
-            val root = JSONObject()
-            root.put("version", 1)
-            root.put("parts", JSONArray().apply { parts.forEach { p -> put(JSONObject().apply {
-                put("code", p.code); put("name", p.name); put("quantity", p.quantity); put("minQuantity", p.minQuantity)
-                put("unit", p.unit); put("photoPath", p.photoPath); put("photoBase64", encodePhotoBase64(p.photoPath)); put("note", p.note); put("updatedAt", p.updatedAt); put("trackingMode", p.trackingMode)
-            }) } })
-            root.put("movements", JSONArray().apply { movements.forEach { m -> put(JSONObject().apply {
-                put("code", m.code); put("partName", m.partName); put("type", m.type); put("amount", m.amount)
-                put("beforeQty", m.beforeQty); put("afterQty", m.afterQty); put("reason", m.reason)
-                put("machineOrStore", m.machineOrStore); put("time", m.time)
-            }) } })
-            context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(root.toString(2)) }
-            onMessage("Đã sao lưu JSON, gồm thông tin kho, lịch sử và ảnh linh kiện nếu có.")
-        } catch (e: Exception) { onMessage("Sao lưu thất bại: ${e.message}") }
+        if (uri != null) {
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val root = JSONObject()
+                        root.put("version", 1)
+                        root.put("parts", JSONArray().apply {
+                            parts.forEach { p -> put(JSONObject().apply {
+                                put("code", p.code)
+                                put("name", p.name)
+                                put("quantity", p.quantity)
+                                put("minQuantity", p.minQuantity)
+                                put("unit", p.unit)
+                                put("photoPath", p.photoPath)
+                                put("photoBase64", encodePhotoBase64(p.photoPath))
+                                put("note", p.note)
+                                put("updatedAt", p.updatedAt)
+                                put("trackingMode", p.trackingMode)
+                            }) }
+                        })
+                        root.put("movements", JSONArray().apply {
+                            movements.forEach { m -> put(JSONObject().apply {
+                                put("code", m.code)
+                                put("partName", m.partName)
+                                put("type", m.type)
+                                put("amount", m.amount)
+                                put("beforeQty", m.beforeQty)
+                                put("afterQty", m.afterQty)
+                                put("reason", m.reason)
+                                put("machineOrStore", m.machineOrStore)
+                                put("time", m.time)
+                            }) }
+                        })
+
+                        val jsonBytes = root.toString(2).toByteArray(Charsets.UTF_8)
+                        check(jsonBytes.isNotEmpty()) { "Dữ liệu sao lưu rỗng" }
+
+                        val output = context.contentResolver.openOutputStream(uri)
+                            ?: error("Không mở được tệp để ghi")
+                        output.use {
+                            it.write(jsonBytes)
+                            it.flush()
+                        }
+
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: error("Không đọc lại được tệp vừa sao lưu")
+                        val savedBytes = input.use { it.readBytes() }
+                        check(savedBytes.isNotEmpty()) { "Tệp sau khi ghi có dung lượng 0 byte" }
+
+                        val checked = JSONObject(String(savedBytes, Charsets.UTF_8))
+                        check(checked.getJSONArray("parts").length() == parts.size) {
+                            "Số linh kiện trong tệp không khớp"
+                        }
+                        check(checked.getJSONArray("movements").length() == movements.size) {
+                            "Số giao dịch trong tệp không khớp"
+                        }
+                    }
+                    onMessage("Sao lưu thành công: ${parts.size} mã linh kiện, ${movements.size} giao dịch.")
+                } catch (e: Exception) {
+                    onMessage("Sao lưu thất bại: ${e.message ?: "Lỗi không xác định"}")
+                }
+            }
+        }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Công cụ", style = MaterialTheme.typography.titleLarge)
@@ -507,7 +556,7 @@ fun saveBitmap(context: android.content.Context, bitmap: Bitmap, name: String) {
 fun encodePhotoBase64(path: String): String {
     if (path.isBlank()) return ""
     val file = File(path)
-    if (!file.exists() || file.length() > 8L * 1024 * 1024) return ""
+    if (!file.exists()) return ""
     return try { android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP) } catch (_: Exception) { "" }
 }
 
