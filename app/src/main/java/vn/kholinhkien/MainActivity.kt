@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
+import android.util.JsonReader
+import android.util.JsonToken
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
@@ -67,7 +69,13 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun InventoryApp() {
-    SupabaseConnectionTest()
+    var currentProfile by remember { mutableStateOf<UserProfile?>(null) }
+
+    if (currentProfile == null) {
+        LoginScreen(onLoginSuccess = { currentProfile = it })
+        return
+    }
+
     val context = LocalContext.current
     val dao = remember { AppDb.get(context).dao() }
     val scope = rememberCoroutineScope()
