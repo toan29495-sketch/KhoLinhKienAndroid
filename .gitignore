@@ -3,3 +3,7 @@ build/
 **/build/
 
 local.properties
+
+local.properties
+
+*.swp
