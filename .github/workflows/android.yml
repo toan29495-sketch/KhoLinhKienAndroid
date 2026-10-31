@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main", "master", "feature/multi-ktv"]
 
 permissions:
   contents: read
@@ -11,8 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Download source code from this repository
+      - name: Download source code
         uses: actions/checkout@v4
 
       - name: Install Java 17
@@ -26,13 +27,23 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK directly from repository source
-        run: gradle --no-daemon assembleDebug
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > release-key.jks
+          test -s release-key.jks
 
-      - name: Upload APK as a downloadable artifact
+      - name: Build signed Release APK
+        env:
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+            RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: KhoLinhKien-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: KhoLinhKien-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30

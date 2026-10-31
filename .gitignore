@@ -7,3 +7,15 @@ local.properties
 local.properties
 
 *.swp
+
+local.properties
+
+# Private Android signing files
+*.jks
+*.keystore
+key-base64.txt
+release-key.jks
+local.properties
+
+# Local backups
+*.backup

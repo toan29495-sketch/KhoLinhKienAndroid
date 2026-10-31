@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun InventoryApp() {
+    SupabaseConnectionTest()
     val context = LocalContext.current
     val dao = remember { AppDb.get(context).dao() }
     val scope = rememberCoroutineScope()

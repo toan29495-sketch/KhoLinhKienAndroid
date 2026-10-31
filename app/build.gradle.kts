@@ -16,6 +16,22 @@ android {
     defaultConfig {
         buildConfigField("String", "SUPABASE_URL", "\"${localConfig.getProperty("SUPABASE_URL", "")}\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${localConfig.getProperty("SUPABASE_PUBLISHABLE_KEY", "")}\"")
+    }signingConfigs {
+            create("release") {
+                        storeFile = rootProject.file("release-key.jks")
+                                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                                        keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                                                keyPassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            }
+    }
+
+    buildTypes {
+            getByName("release") {
+                        signingConfig = signingConfigs.getByName("release")
+                                isMinifyEnabled = false
+            }
+    }
+            }
     }
     namespace = "vn.kholinhkien"
     compileSdk = 35
