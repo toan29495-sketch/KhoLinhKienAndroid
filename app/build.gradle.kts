@@ -1,10 +1,22 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 android {
+    val localConfig = Properties()
+    rootProject.file("local.properties").inputStream().use {
+        localConfig.load(it)
+    }
+
+    defaultConfig {
+        buildConfigField("String", "SUPABASE_URL", "\"${localConfig.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${localConfig.getProperty("SUPABASE_PUBLISHABLE_KEY", "")}\"")
+    }
     namespace = "vn.kholinhkien"
     compileSdk = 35
     defaultConfig {
@@ -14,7 +26,10 @@ android {
         versionCode = 3
         versionName = "1.2"
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -39,4 +54,10 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.0.1"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:storage-kt")
+    implementation("io.ktor:ktor-client-android:3.0.0")
+
 }
