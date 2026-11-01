@@ -172,7 +172,7 @@ fun InventoryApp() {
                             trailingContent = { Text(SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(m.time))) })
                         HorizontalDivider()
                     } }
-                2 -> ToolsScreen(parts, movements, onBatch = { showBatch = true }, onRestore = { restoreLauncher.launch(arrayOf("application/json", "text/*")) }, onMessage = { message = it })
+                2 -> ToolsScreen(parts, movements, onBatch = { showBatch = true }, onRestore = { restoreLauncher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/json", "text/*")) }, onMessage = { message = it })
             }
         }
     }
@@ -182,38 +182,77 @@ fun InventoryApp() {
             title = { Text("Xác nhận khôi phục") },
             text = { Text("Khôi phục sẽ thay thế toàn bộ danh sách linh kiện và lịch sử trên điện thoại này. Hãy chắc chắn bạn đã sao lưu dữ liệu hiện tại.") },
             confirmButton = {
-                TextButton(onClick = {
-                    restoreUri = null
-                    scope.launch {
-                        try {
-                            val raw = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+            TextButton(onClick = {
+                val uri = restoreUri
+                restoreUri = null
+                if (uri != null) scope.launch {
+                    try {
+                        val isZip = context.contentResolver
+                            .openInputStream(uri)?.use {
+                                it.read() == 0x50 && it.read() == 0x4B
+                            } ?: false
+
+                        if (isZip) {
+                            val result = ZipRestore.restore(context, uri, dao)
+                            message = "Khôi phục ZIP thành công: ${result.first} linh kiện, ${result.second} giao dịch."
+                        } else {
+                            val raw = context.contentResolver
+                                .openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                                 ?: error("Không đọc được tệp")
+
                             val root = JSONObject(raw)
                             val newParts = mutableListOf<Part>()
                             val pa = root.getJSONArray("parts")
+
                             for (i in 0 until pa.length()) {
                                 val o = pa.getJSONObject(i)
-                                newParts.add(Part(code=o.getString("code"), name=o.optString("name"), quantity=o.optInt("quantity"),
-                                    minQuantity=o.optInt("minQuantity"), unit=o.optString("unit", "cái"),
-                                    photoPath=restorePhotoFromBase64(context, o.optString("photoBase64"), o.optString("photoPath")),
-                                    note=o.optString("note"), updatedAt=o.optLong("updatedAt", System.currentTimeMillis()), trackingMode=o.optString("trackingMode", "SINGLE")))
+                                newParts.add(Part(
+                                    code = o.getString("code"),
+                                    name = o.optString("name"),
+                                    quantity = o.optInt("quantity"),
+                                    minQuantity = o.optInt("minQuantity"),
+                                    unit = o.optString("unit", "cái"),
+                                    photoPath = restorePhotoFromBase64(
+                                        context, o.optString("photoBase64"),
+                                        o.optString("photoPath")
+                                    ),
+                                    note = o.optString("note"),
+                                    updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+                                    trackingMode = o.optString("trackingMode", "SINGLE")
+                                ))
                             }
+
                             val newMoves = mutableListOf<Movement>()
                             val ma = root.optJSONArray("movements") ?: JSONArray()
+
                             for (i in 0 until ma.length()) {
                                 val o = ma.getJSONObject(i)
-                                newMoves.add(Movement(code=o.getString("code"), partName=o.optString("partName"), type=o.optString("type"),
-                                    amount=o.optInt("amount"), beforeQty=o.optInt("beforeQty"), afterQty=o.optInt("afterQty"),
-                                    reason=o.optString("reason"), machineOrStore=o.optString("machineOrStore"), time=o.optLong("time", System.currentTimeMillis())))
+                                newMoves.add(Movement(
+                                    code = o.getString("code"),
+                                    partName = o.optString("partName"),
+                                    type = o.optString("type"),
+                                    amount = o.optInt("amount"),
+                                    beforeQty = o.optInt("beforeQty"),
+                                    afterQty = o.optInt("afterQty"),
+                                    reason = o.optString("reason"),
+                                    machineOrStore = o.optString("machineOrStore"),
+                                    time = o.optLong("time", System.currentTimeMillis())
+                                ))
                             }
-                            require(newParts.map { it.code }.distinct().size == newParts.size) { "Tệp có mã linh kiện trùng nhau" }
+
+                            require(newParts.map { it.code }.distinct().size == newParts.size) {
+                                "Tệp có mã linh kiện trùng nhau"
+                            }
                             dao.restoreAll(newParts, newMoves)
-                            message = "Khôi phục xong ${newParts.size} mã và ${newMoves.size} giao dịch."
-                        } catch (e: Exception) { message = "Khôi phục thất bại: ${e.message}" }
+                            message = "Khôi phục JSON thành công: ${newParts.size} linh kiện, ${newMoves.size} giao dịch."
+                        }
+                    } catch (e: Exception) {
+                        message = "Khôi phục thất bại: ${e.message}"
                     }
-                }) { Text("Khôi phục và thay thế") }
-            },
-            dismissButton = { TextButton(onClick = { restoreUri = null }) { Text("Hủy") } }
+                }
+            }) { Text("Khôi phục và thay thế") }
+        },
+        dismissButton = { TextButton(onClick = { restoreUri = null }) { Text("Hủy") } }
         )
     }
     if (showAdd) AddPartDialog(initialCode = prefillCode, photoPath = pendingPhotoPath, onChoosePhoto = { photoPicker.launch("image/*") }, onTakePhoto = takePhoto, onDismiss = { showAdd = false; pendingPhotoPath = ""; prefillCode = "" }, onSave = { part ->
@@ -439,103 +478,27 @@ fun ToolsScreen(parts: List<Part>, movements: List<Movement>, onBatch: () -> Uni
         } catch (e: Exception) { onMessage("Xuất Excel thất bại: ${e.message}") }
     }
     val scope = rememberCoroutineScope()
-    val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    val backupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
         if (uri != null) {
             scope.launch {
-                val temp = File(context.cacheDir, "backup_${System.currentTimeMillis()}.json")
                 try {
-                    withContext(Dispatchers.IO) {
-                        FileOutputStream(temp).bufferedWriter(Charsets.UTF_8).use { w ->
-                            w.write("{\"version\":1,\"parts\":[")
-                            parts.forEachIndexed { i, p ->
-                                if (i > 0) w.write(",")
-                                w.write("{")
-                                w.write("\"code\":${JSONObject.quote(p.code)},")
-                                w.write("\"name\":${JSONObject.quote(p.name)},")
-                                w.write("\"quantity\":${p.quantity},")
-                                w.write("\"minQuantity\":${p.minQuantity},")
-                                w.write("\"unit\":${JSONObject.quote(p.unit)},")
-                                w.write("\"photoPath\":${JSONObject.quote(p.photoPath)},")
-                                w.write("\"photoBase64\":\"")
-                                val f = File(p.photoPath)
-                                if (p.photoPath.isNotBlank() && f.isFile) {
-                                    java.io.FileInputStream(f).use { input ->
-                                        val buf = ByteArray(12 * 1024)
-                                        var carry = 0
-                                        while (true) {
-                                            val n = input.read(buf, carry, buf.size - carry)
-                                            if (n < 0) {
-                                                if (carry > 0) w.write(android.util.Base64.encodeToString(buf, 0, carry, android.util.Base64.NO_WRAP))
-                                                break
-                                            }
-                                            if (n == 0) continue
-                                            val total = carry + n
-                                            val count = total - total % 3
-                                            if (count > 0) w.write(android.util.Base64.encodeToString(buf, 0, count, android.util.Base64.NO_WRAP))
-                                            carry = total - count
-                                            if (carry > 0) System.arraycopy(buf, count, buf, 0, carry)
-                                        }
-                                    }
-                                }
-                                w.write("\",")
-                                w.write("\"note\":${JSONObject.quote(p.note)},")
-                                w.write("\"updatedAt\":${p.updatedAt},")
-                                w.write("\"trackingMode\":${JSONObject.quote(p.trackingMode)}")
-                                w.write("}")
-                            }
-                            w.write("],\"movements\":[")
-                            movements.forEachIndexed { i, m ->
-                                if (i > 0) w.write(",")
-                                w.write("{")
-                                w.write("\"code\":${JSONObject.quote(m.code)},")
-                                w.write("\"partName\":${JSONObject.quote(m.partName)},")
-                                w.write("\"type\":${JSONObject.quote(m.type)},")
-                                w.write("\"amount\":${m.amount},")
-                                w.write("\"beforeQty\":${m.beforeQty},")
-                                w.write("\"afterQty\":${m.afterQty},")
-                                w.write("\"reason\":${JSONObject.quote(m.reason)},")
-                                w.write("\"machineOrStore\":${JSONObject.quote(m.machineOrStore)},")
-                                w.write("\"time\":${m.time}")
-                                w.write("}")
-                            }
-                            w.write("]}")
-                        }
-                        check(temp.isFile && temp.length() > 0L) { "Tep sao luu tam rong" }
-                        val out = context.contentResolver.openOutputStream(uri)
-                            ?: error("Khong mo duoc tep de ghi")
-                        out.use { dst ->
-                            java.io.FileInputStream(temp).use { it.copyTo(dst, 65536) }
-                            dst.flush()
-                        }
-                        val input = context.contentResolver.openInputStream(uri)
-                            ?: error("Khong doc lai duoc tep")
-                        val size = input.use { stream ->
-                            val b = ByteArray(65536)
-                            var total = 0L
-                            while (true) {
-                                val n = stream.read(b)
-                                if (n < 0) break
-                                total += n
-                            }
-                            total
-                        }
-                        check(size > 0L && size == temp.length()) { "Kich thuoc tep sau khi ghi khong khop" }
-                    }
-                    onMessage("Sao luu thanh cong: ${parts.size} ma, ${movements.size} giao dich.")
+                    BackupManager.createZip(context, uri, parts, movements)
+                    onMessage("Sao lưu ZIP thành công: ${parts.size} linh kiện, ${movements.size} giao dịch.")
                 } catch (e: Exception) {
-                    onMessage("Sao luu that bai: ${e.message ?: "Loi khong xac dinh"}")
-                } finally {
-                    withContext(Dispatchers.IO) { temp.delete() }
+                    onMessage("Sao lưu ZIP thất bại: ${e.message}")
                 }
             }
         }
     }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Công cụ", style = MaterialTheme.typography.titleLarge)
         OutlinedButton(onClick = onBatch, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.QrCode, null); Spacer(Modifier.width(8.dp)); Text("Tạo mã linh kiện hàng loạt / đọc từ ảnh") }
         OutlinedButton(onClick = { exportLauncher.launch("bao_cao_kho.xlsx") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("Xuất Excel XLSX (tồn kho + lịch sử)") }
-        OutlinedButton(onClick = { backupLauncher.launch("sao_luu_kho.json") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Backup, null); Spacer(Modifier.width(8.dp)); Text("Sao lưu dữ liệu JSON") }
-        OutlinedButton(onClick = onRestore, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Restore, null); Spacer(Modifier.width(8.dp)); Text("Khôi phục từ tệp JSON (thay dữ liệu hiện tại)") }
+        OutlinedButton(onClick = { backupLauncher.launch("sao_luu_kho.json") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Backup, null); Spacer(Modifier.width(8.dp)); Text("Sao lưu ZIP (kèm ảnh)") }
+        OutlinedButton(onClick = onRestore, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Restore, null); Spacer(Modifier.width(8.dp)); Text("Khôi phục ZIP / JSON cũ (thay dữ liệu hiện tại)") }
         Text("Tổng mã: ${parts.size} · Tổng tồn: ${parts.sumOf { it.quantity }} · Giao dịch: ${movements.size}")
         Text("Cảnh báo: khôi phục sẽ thay thế dữ liệu hiện tại. Hãy sao lưu trước khi khôi phục.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }

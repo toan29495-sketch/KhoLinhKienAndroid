@@ -60,6 +60,12 @@ interface InventoryDao {
     suspend fun insertMovement(movement: Movement)
     @Insert
     suspend fun insertPart(part: Part)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertParts(parts: List<Part>)
+
+    @Insert
+    suspend fun insertMovements(movements: List<Movement>)
     @Transaction
     suspend fun restoreAll(newParts: List<Part>, newMovements: List<Movement>) {
         clearMovements()
