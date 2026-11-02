@@ -1,38 +1,56 @@
-name: Build Android APK
+name: Android build validation
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - work/auth-foundation
+      - main
+      - master
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Download source code from this repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install Java 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Gradle 8.9
+      # This branch does not contain Gradle Wrapper files yet.
+      # Install the AGP-compatible Gradle 8.9 directly on the GitHub runner.
+      - name: Set up Gradle 8.9 with dependency cache
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK directly from repository source
-        run: gradle --no-daemon assembleDebug
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Upload APK as a downloadable artifact
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses
+
+      - name: Compile Kotlin and build debug APK
+        run: gradle --no-daemon --stacktrace :app:compileDebugKotlin :app:assembleDebug
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: KhoLinhKien-debug-apk
+          name: KhoLinhKien-debug-validation
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
