@@ -1,36 +1,29 @@
-name: Android build validation
+name: Build Android APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - work/auth-foundation
-      - main
-      - master
 
 permissions:
   contents: read
 
-concurrency:
-  group: android-validation-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  validate:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Install Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # This branch does not contain Gradle Wrapper files yet.
-      # Install the AGP-compatible Gradle 8.9 directly on the GitHub runner.
+      # Current branch has no Gradle Wrapper; use a pinned Gradle on the runner.
       - name: Set up Gradle 8.9 with dependency cache
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -44,13 +37,31 @@ jobs:
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
           yes | sdkmanager --licenses
 
-      - name: Compile Kotlin and build debug APK
-        run: gradle --no-daemon --stacktrace :app:compileDebugKotlin :app:assembleDebug
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > release-key.jks
+          test -s release-key.jks
 
-      - name: Upload debug APK
+      - name: Create local.properties
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          printf 'SUPABASE_URL=%s\\nSUPABASE_PUBLISHABLE_KEY=%s\\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+
+      - name: Build signed Release APK
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: KhoLinhKien-debug-validation
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: KhoLinhKien-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
