@@ -36,13 +36,20 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # GitHub-hosted Ubuntu runners already include Android SDK.
+      # Avoid setup-android's legacy "sdkmanager tools" call (removed from current SDK repositories).
+      - name: Configure preinstalled Android SDK
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "/usr/local/lib/android/sdk/platform-tools" >> "$GITHUB_PATH"
+          SDKMANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          yes | "$SDKMANAGER" --licenses
 
       - name: Install Android SDK components
         run: |
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-          yes | sdkmanager --licenses
 
       - name: Compile Kotlin and build debug APK
         run: gradle --no-daemon --stacktrace :app:compileDebugKotlin :app:assembleDebug
