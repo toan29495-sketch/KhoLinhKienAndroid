@@ -1,0 +1,91 @@
+name: Step208 completion build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - work/step208-completion-build
+    paths:
+      - Step208-source.zip
+
+permissions:
+  contents: read
+
+concurrency:
+  group: step208-completion-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout upload branch
+        uses: actions/checkout@v4
+
+      - name: Validate source archive
+        run: |
+          test -s Step208-source.zip
+          unzip -t Step208-source.zip
+          mkdir -p "$RUNNER_TEMP/step208"
+          unzip -q Step208-source.zip -d "$RUNNER_TEMP/step208"
+          SOURCE_ROOT="$RUNNER_TEMP/step208/KhoLinhKienAndroid"
+          test -f "$SOURCE_ROOT/settings.gradle.kts"
+          test -f "$SOURCE_ROOT/gradlew"
+          test -f "$SOURCE_ROOT/app/build.gradle.kts"
+          cp -a "$SOURCE_ROOT/." "$GITHUB_WORKSPACE/"
+          chmod +x ./gradlew
+          test -x ./gradlew
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Supabase client values
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL repository secret"; exit 1; }
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "Missing SUPABASE_PUBLISHABLE_KEY repository secret"; exit 1; }
+          printf 'SUPABASE_URL=%s\\nSUPABASE_PUBLISHABLE_KEY=%s\\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses
+
+      - name: Set up Gradle from project Wrapper
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run source regression checks
+        run: |
+          python -m compileall -q tools
+          for f in tools/verify_step{190..208}*.py tools/verify_step114_restore_account_isolation.py tools/verify_step127_photo_retry_idempotency.py tools/verify_step141_restore_remote_contract.py tools/verify_step142_remote_reconciliation.py; do
+            test -f "$f" || continue
+            python "$f"
+          done
+
+      - name: Compile Kotlin and build debug APK
+        run: ./gradlew --no-daemon --stacktrace :app:compileDebugKotlin :app:assembleDebug
+
+      - name: Calculate APK SHA-256
+        run: sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/app-debug.apk.sha256
+
+      - name: Upload APK and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: KhoLinhKien-Step208-debug-validation
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/app-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 14
