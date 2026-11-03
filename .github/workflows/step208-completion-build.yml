@@ -51,12 +51,12 @@ jobs:
 
       - name: Configure Supabase client values
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL: ${ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL repository secret"; exit 1; }
           test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "Missing SUPABASE_PUBLISHABLE_KEY repository secret"; exit 1; }
-          printf 'SUPABASE_URL=%s\\nSUPABASE_PUBLISHABLE_KEY=%s\\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+          printf 'SUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
 
       - name: Install Android SDK components
         run: |
