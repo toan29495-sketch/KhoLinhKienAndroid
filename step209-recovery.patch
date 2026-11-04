@@ -1,1 +1,185 @@
-PLACEHOLDER
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index a074568..b123529 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -6,5 +6,13 @@
+         <activity android:name=".MainActivity" android:exported="true">
+             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+         </activity>
++        <activity android:name=".PasswordRecoveryActivity" android:exported="true">
++            <intent-filter>
++                <action android:name="android.intent.action.VIEW" />
++                <category android:name="android.intent.category.DEFAULT" />
++                <category android:name="android.intent.category.BROWSABLE" />
++                <data android:scheme="vn.kholinhkien" android:host="auth-callback" />
++            </intent-filter>
++        </activity>
+     </application>
+ </manifest>
+diff --git a/app/src/main/java/vn/kholinhkien/AuthRepository.kt b/app/src/main/java/vn/kholinhkien/AuthRepository.kt
+index b094464..c46a27b 100644
+--- a/app/src/main/java/vn/kholinhkien/AuthRepository.kt
++++ b/app/src/main/java/vn/kholinhkien/AuthRepository.kt
+@@ -56,6 +56,19 @@ class AuthRepository {
+         }
+     }
+ 
++    suspend fun requestPasswordRecovery(username: String) {
++        client.auth.resetPasswordForEmail(
++            email = usernameToEmail(username),
++            redirectUrl = "vn.kholinhkien://auth-callback"
++        )
++    }
++
++    suspend fun completePasswordRecovery(newPassword: String) {
++        require(newPassword.length >= 6) { "Mật khẩu mới phải có ít nhất 6 ký tự" }
++        check(isLoggedIn()) { "Liên kết khôi phục không hợp lệ hoặc đã hết hạn" }
++        client.auth.updateUser { password = newPassword }
++    }
++
+     suspend fun getCurrentProfile(): UserProfile {
+         val userId = client.auth.currentUserOrNull()?.id ?: error("Bạn chưa đăng nhập")
+         val profile = client.from("profiles").select {
+diff --git a/app/src/main/java/vn/kholinhkien/LoginScreen.kt b/app/src/main/java/vn/kholinhkien/LoginScreen.kt
+index 0f16dd8..04d94af 100644
+--- a/app/src/main/java/vn/kholinhkien/LoginScreen.kt
++++ b/app/src/main/java/vn/kholinhkien/LoginScreen.kt
+@@ -21,6 +21,7 @@ fun LoginScreen(
+     var password by remember { mutableStateOf("") }
+     var message by remember { mutableStateOf("") }
+     var loading by remember { mutableStateOf(false) }
++    var messageIsSuccess by remember { mutableStateOf(false) }
+ 
+     val scope = rememberCoroutineScope()
+     val repository = remember { AuthRepository() }
+@@ -73,11 +74,33 @@ fun LoginScreen(
+         if (message.isNotBlank()) {
+             Text(
+                 text = message,
+-                color = MaterialTheme.colorScheme.error
++                color = if (messageIsSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+             )
+             Spacer(Modifier.height(12.dp))
+         }
+ 
++        TextButton(
++            onClick = {
++                if (username.isBlank()) {
++                    message = "Nhập tên tài khoản cần khôi phục trước"
++                    messageIsSuccess = false
++                } else scope.launch {
++                    loading = true
++                    message = ""
++                    messageIsSuccess = false
++                    try {
++                        withContext(Dispatchers.IO) { repository.requestPasswordRecovery(username) }
++                        message = "Nếu tài khoản hợp lệ, liên kết khôi phục đã được gửi tới Gmail đăng ký. Hãy mở email trên điện thoại này."
++                        messageIsSuccess = true
++                    } catch (e: Exception) {
++                        message = e.message ?: "Chưa gửi được email khôi phục. Vui lòng thử lại sau."
++                    } finally { loading = false }
++                }
++            },
++            enabled = !loading,
++            modifier = Modifier.fillMaxWidth()
++        ) { Text("QUÊN MẬT KHẨU? GỬI LIÊN KẾT VÀO GMAIL") }
++
+         Button(
+             onClick = {
+                 if (username.isBlank()) {
+diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
+new file mode 100644
+index 0000000..87708d9
+--- /dev/null
++++ b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
+@@ -0,0 +1,74 @@
++package vn.kholinhkien
++
++import android.os.Bundle
++import androidx.activity.ComponentActivity
++import androidx.activity.compose.setContent
++import androidx.compose.foundation.layout.*
++import androidx.compose.material3.*
++import androidx.compose.runtime.*
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.text.input.PasswordVisualTransformation
++import androidx.compose.ui.unit.dp
++import io.github.jan.supabase.handleDeeplinks
++import kotlinx.coroutines.launch
++
++class PasswordRecoveryActivity : ComponentActivity() {
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        SupabaseClientProvider.client.handleDeeplinks(intent)
++        setContent {
++            MaterialTheme {
++                PasswordRecoveryContent(
++                    hasSession = AuthRepository().isLoggedIn(),
++                    onSaved = { finish() },
++                    onCancel = { finish() }
++                )
++            }
++        }
++    }
++}
++
++@Composable
++private fun PasswordRecoveryContent(hasSession: Boolean, onSaved: () -> Unit, onCancel: () -> Unit) {
++    var password by remember { mutableStateOf("") }
++    var confirmation by remember { mutableStateOf("") }
++    var message by remember { mutableStateOf("") }
++    var loading by remember { mutableStateOf(false) }
++    val scope = rememberCoroutineScope()
++    val repository = remember { AuthRepository() }
++
++    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
++        Text("KHÔI PHỤC MẬT KHẨU", style = MaterialTheme.typography.headlineSmall)
++        Spacer(Modifier.height(16.dp))
++        if (!hasSession) {
++            Text("Liên kết không hợp lệ hoặc đã hết hạn. Hãy quay lại ứng dụng và gửi liên kết mới.")
++            Spacer(Modifier.height(16.dp))
++            Button(onClick = onCancel) { Text("ĐÓNG") }
++        } else {
++            Text("Email đã xác thực. Hãy tạo mật khẩu mới.")
++            Spacer(Modifier.height(16.dp))
++            OutlinedTextField(password, { password = it }, label = { Text("Mật khẩu mới (ít nhất 6 ký tự)") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
++            Spacer(Modifier.height(10.dp))
++            OutlinedTextField(confirmation, { confirmation = it }, label = { Text("Nhập lại mật khẩu mới") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
++            if (message.isNotBlank()) { Spacer(Modifier.height(10.dp)); Text(message, color = MaterialTheme.colorScheme.error) }
++            Spacer(Modifier.height(16.dp))
++            Button(onClick = {
++                when {
++                    password.length < 6 -> message = "Mật khẩu mới phải có ít nhất 6 ký tự"
++                    password != confirmation -> message = "Hai mật khẩu không trùng khớp"
++                    else -> scope.launch {
++                        loading = true
++                        message = ""
++                        try { repository.completePasswordRecovery(password); onSaved() }
++                        catch (error: Exception) { message = error.message ?: "Không thể cập nhật mật khẩu. Hãy gửi liên kết mới nếu đã hết hạn." }
++                        finally { loading = false }
++                    }
++                }
++            }, enabled = !loading, modifier = Modifier.fillMaxWidth()) {
++                if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text("LƯU MẬT KHẨU MỚI")
++            }
++            TextButton(onClick = onCancel, enabled = !loading) { Text("Hủy") }
++        }
++    }
++}
+diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
+index 00c05af..bef990a 100644
+--- a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
++++ b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
+@@ -10,7 +10,10 @@ object SupabaseClientProvider {
+         supabaseUrl = BuildConfig.SUPABASE_URL,
+         supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
+     ) {
+-        install(Auth)
++        install(Auth) {
++            scheme = "vn.kholinhkien"
++            host = "auth-callback"
++        }
+         install(Postgrest)
+         install(Storage)
+     }
