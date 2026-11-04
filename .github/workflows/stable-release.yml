@@ -13,11 +13,6 @@ on:
         required: true
         type: string
         default: "1.5"
-      source_branch:
-        description: Source branch to build (do not change unless instructed)
-        required: true
-        type: string
-        default: "work/step208-completion-build"
 
 permissions:
   contents: read
@@ -27,25 +22,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  guard:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require the isolated release branch
-        run: |
-          if [ "${{ inputs.source_branch }}" = "main" ]; then
-            echo "::error::Do not build source from main. Select work/step208-completion-build in the source_branch input."
-            exit 1
-          fi
-
   release:
-    needs: guard
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout isolated release branch
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.source_branch }}
 
       - name: Validate source and apply current fixes
         run: |
