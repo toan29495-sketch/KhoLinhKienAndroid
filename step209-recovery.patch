@@ -89,10 +89,10 @@ index 0f16dd8..04d94af 100644
                  if (username.isBlank() || password.isBlank()) {
 diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
 new file mode 100644
-index 0000000..87708d9
+index 0000000..cbf7d00
 --- /dev/null
 +++ b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,96 @@
 +package vn.kholinhkien
 +
 +import android.os.Bundle
@@ -105,17 +105,37 @@ index 0000000..87708d9
 +import androidx.compose.ui.Modifier
 +import androidx.compose.ui.text.input.PasswordVisualTransformation
 +import androidx.compose.ui.unit.dp
-+import io.github.jan.supabase.handleDeeplinks
++import androidx.lifecycle.lifecycleScope
++import io.github.jan.supabase.auth.auth
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
 +import kotlinx.coroutines.launch
 +
 +class PasswordRecoveryActivity : ComponentActivity() {
++    private var sessionReady by mutableStateOf(false)
++    private var hasRecoverySession by mutableStateOf(false)
++
 +    override fun onCreate(savedInstanceState: Bundle?) {
 +        super.onCreate(savedInstanceState)
-+        SupabaseClientProvider.client.handleDeeplinks(intent)
++        val callbackUrl = intent.data?.toString().orEmpty()
++        lifecycleScope.launch {
++            try {
++                require(callbackUrl.isNotBlank()) { "Thiếu liên kết xác thực" }
++                val auth = SupabaseClientProvider.client.auth
++                val session = withContext(Dispatchers.IO) { auth.parseSessionFromUrl(callbackUrl) }
++                withContext(Dispatchers.IO) { auth.importSession(session) }
++                hasRecoverySession = AuthRepository().isLoggedIn()
++            } catch (_: Exception) {
++                hasRecoverySession = false
++            } finally {
++                sessionReady = true
++            }
++        }
 +        setContent {
 +            MaterialTheme {
 +                PasswordRecoveryContent(
-+                    hasSession = AuthRepository().isLoggedIn(),
++                    sessionReady = sessionReady,
++                    hasSession = hasRecoverySession,
 +                    onSaved = { finish() },
 +                    onCancel = { finish() }
 +                )
@@ -125,7 +145,7 @@ index 0000000..87708d9
 +}
 +
 +@Composable
-+private fun PasswordRecoveryContent(hasSession: Boolean, onSaved: () -> Unit, onCancel: () -> Unit) {
++private fun PasswordRecoveryContent(sessionReady: Boolean, hasSession: Boolean, onSaved: () -> Unit, onCancel: () -> Unit) {
 +    var password by remember { mutableStateOf("") }
 +    var confirmation by remember { mutableStateOf("") }
 +    var message by remember { mutableStateOf("") }
@@ -136,7 +156,9 @@ index 0000000..87708d9
 +    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
 +        Text("KHÔI PHỤC MẬT KHẨU", style = MaterialTheme.typography.headlineSmall)
 +        Spacer(Modifier.height(16.dp))
-+        if (!hasSession) {
++        if (!sessionReady) {
++            CircularProgressIndicator()
++        } else if (!hasSession) {
 +            Text("Liên kết không hợp lệ hoặc đã hết hạn. Hãy quay lại ứng dụng và gửi liên kết mới.")
 +            Spacer(Modifier.height(16.dp))
 +            Button(onClick = onCancel) { Text("ĐÓNG") }
@@ -167,7 +189,7 @@ index 0000000..87708d9
 +        }
 +    }
 +}
-diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
++diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
 index 00c05af..bef990a 100644
 --- a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
 +++ b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
