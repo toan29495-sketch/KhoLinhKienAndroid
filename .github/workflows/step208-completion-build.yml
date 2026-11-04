@@ -37,6 +37,9 @@ jobs:
           cp -a "$SOURCE_ROOT/." "$GITHUB_WORKSPACE/"
           chmod +x ./gradlew
           test -x ./gradlew
+          git apply --check step208-fixes.patch
+          git apply step208-fixes.patch
+          git diff --check
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
