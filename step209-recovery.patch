@@ -211,7 +211,7 @@ new file mode 100644
 index 0000000..2ea7b7f
 --- /dev/null
 +++ b/tools/verify_step209_admin_password_recovery.py
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,21 @@
 +from pathlib import Path
 +
 +root = Path(__file__).resolve().parents[1]
@@ -227,7 +227,7 @@ index 0000000..2ea7b7f
 +    "new password requires recovery session": "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth,
 +    "Auth callback scheme configured": 'scheme = "vn.kholinhkien"' in provider and 'host = "auth-callback"' in provider,
 +    "manifest exposes callback activity": 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest,
-+    "callback imports Supabase session": "handleDeeplinks(intent)" in recovery,
++    "callback imports Supabase session": "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery,
 +}
 +for label, passed in checks.items():
 +    print(f"{'PASS' if passed else 'FAIL'} | {label}")
