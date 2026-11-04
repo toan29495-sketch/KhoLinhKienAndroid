@@ -37,7 +37,7 @@ jobs:
       - name: Checkout isolated release branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_branch }}
+          ref: "${{ inputs.source_branch }}"
 
       - name: Validate source and apply current fixes
         run: |
@@ -155,12 +155,12 @@ checks["empty profile result has actionable message"] = "Không thể tải hồ
 
       - name: Configure Supabase values and persistent release signing
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          SUPABASE_URL: "${{ secrets.SUPABASE_URL }}"
+          SUPABASE_PUBLISHABLE_KEY: "${{ secrets.SUPABASE_PUBLISHABLE_KEY }}"
+          RELEASE_KEYSTORE_BASE64: "${{ secrets.RELEASE_KEYSTORE_BASE64 }}"
+          RELEASE_KEYSTORE_PASSWORD: "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}"
+          RELEASE_KEY_ALIAS: "${{ secrets.RELEASE_KEY_ALIAS }}"
+          RELEASE_KEY_PASSWORD: "${{ secrets.RELEASE_KEY_PASSWORD }}"
         run: |
           set -euo pipefail
           for name in SUPABASE_URL SUPABASE_PUBLISHABLE_KEY RELEASE_KEYSTORE_BASE64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
@@ -201,8 +201,8 @@ checks["empty profile result has actionable message"] = "Không thể tải hồ
 
       - name: Apply release version
         env:
-          VERSION_CODE: ${{ inputs.version_code }}
-          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: "${{ inputs.version_code }}"
+          VERSION_NAME: "${{ inputs.version_name }}"
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -237,9 +237,9 @@ checks["empty profile result has actionable message"] = "Không thể tải hồ
 
       - name: Build signed release APK
         env:
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_KEYSTORE_PASSWORD: "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}"
+          RELEASE_KEY_ALIAS: "${{ secrets.RELEASE_KEY_ALIAS }}"
+          RELEASE_KEY_PASSWORD: "${{ secrets.RELEASE_KEY_PASSWORD }}"
         run: ./gradlew --no-daemon --stacktrace :app:compileReleaseKotlin :app:assembleRelease
 
       - name: Verify APK signature and calculate checksum
@@ -254,7 +254,7 @@ checks["empty profile result has actionable message"] = "Không thể tải hồ
       - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: KhoLinhKien-Stable-Release-v${{ inputs.version_name }}
+          name: "KhoLinhKien-Stable-Release-v${{ inputs.version_name }}"
           path: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/release/app-release.apk.sha256
