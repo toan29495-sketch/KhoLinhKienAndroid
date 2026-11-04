@@ -82,6 +82,43 @@ jobs:
           if "FlowType.PKCE" not in v:
               v = v.replace('"auth.importSession(session)" in recovery,', '"auth.importSession(session)" in recovery and "FlowType.PKCE" in provider,', 1)
           verifier.write_text(v)
+
+          # Step211: preserve self-profile visibility during mandatory password change.
+          migration_source = Path("step211-profile-forced-change-rls.sql")
+          if not migration_source.is_file():
+              raise SystemExit("Missing Step211 profile RLS migration")
+          migration_dir = Path("supabase/migrations")
+          migration_dir.mkdir(parents=True, exist_ok=True)
+          migration_target = migration_dir / "20261104180000_step211_allow_self_profile_read_during_forced_password_change.sql"
+          migration_target.write_text(migration_source.read_text())
+
+          auth_repo = Path("app/src/main/java/vn/kholinhkien/AuthRepository.kt")
+          auth_text = auth_repo.read_text()
+          old_profile_query = '''        val profile = client.from("profiles").select {
+            filter { eq("id", userId) }
+        }.decodeSingle<UserProfile>()'''
+          new_profile_query = '''        val profiles = client.from("profiles").select {
+            filter { eq("id", userId) }
+        }.decodeList<UserProfile>()
+        val profile = profiles.firstOrNull()
+            ?: throw IllegalStateException("Không thể tải hồ sơ tài khoản. Hãy kiểm tra quyền đọc hồ sơ hoặc liên hệ Admin.")'''
+          if old_profile_query in auth_text:
+              auth_text = auth_text.replace(old_profile_query, new_profile_query, 1)
+          elif "Không thể tải hồ sơ tài khoản." not in auth_text:
+              raise SystemExit("Could not locate getCurrentProfile query for safe empty-result handling")
+          auth_repo.write_text(auth_text)
+
+          verifier = Path("tools/verify_step209_admin_password_recovery.py")
+          v = verifier.read_text()
+          if "forced-password profile RLS migration is present" not in v:
+              anchor = "for label, passed in checks.items():"
+              extra = '''checks["forced-password profile RLS migration is present"] = (root / "supabase/migrations/20261104180000_step211_allow_self_profile_read_during_forced_password_change.sql").is_file()
+checks["empty profile result has actionable message"] = "Không thể tải hồ sơ tài khoản." in auth
+'''
+              if anchor not in v:
+                  raise SystemExit("Could not locate Step209 verifier result loop")
+              v = v.replace(anchor, extra + anchor, 1)
+          verifier.write_text(v)
           PY
           git diff --check
 
