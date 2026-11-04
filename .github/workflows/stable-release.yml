@@ -45,6 +45,8 @@ jobs:
           git apply step208-fixes.patch
           git apply --check step209-recovery.patch
           git apply step209-recovery.patch
+          git apply --check step210-recovery-fix.patch
+          git apply step210-recovery-fix.patch
           git diff --check
 
       - name: Set up JDK 17
