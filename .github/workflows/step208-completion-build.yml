@@ -55,7 +55,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # The legacy SDK package "tools" is no longer published. Install only platform-tools.
+          # Diagnostic rerun: preserve source ZIP before compilation. The legacy SDK package "tools" is no longer published. Install only platform-tools.
           packages: "platform-tools"
 
       - name: Configure Supabase client values
