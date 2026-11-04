@@ -1,6 +1,8 @@
 name: KhoLinhKien stable release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       source_branch:
