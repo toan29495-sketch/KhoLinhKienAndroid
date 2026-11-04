@@ -1,0 +1,25 @@
+name: Validate stable release workflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/stable-release.yml"
+      - ".github/workflows/validate-stable-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install actionlint
+        uses: reviewdog/action-actionlint@v1
+
+      - name: Validate complete stable release workflow
+        run: actionlint -color .github/workflows/stable-release.yml
