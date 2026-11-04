@@ -183,3 +183,31 @@ index 00c05af..bef990a 100644
          install(Postgrest)
          install(Storage)
      }
+diff --git a/tools/verify_step209_admin_password_recovery.py b/tools/verify_step209_admin_password_recovery.py
+new file mode 100644
+index 0000000..2ea7b7f
+--- /dev/null
++++ b/tools/verify_step209_admin_password_recovery.py
+@@ -0,0 +1,21 @@
++from pathlib import Path
++
++root = Path(__file__).resolve().parents[1]
++auth = (root / "app/src/main/java/vn/kholinhkien/AuthRepository.kt").read_text()
++login = (root / "app/src/main/java/vn/kholinhkien/LoginScreen.kt").read_text()
++provider = (root / "app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt").read_text()
++manifest = (root / "app/src/main/AndroidManifest.xml").read_text()
++recovery = (root / "app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt").read_text()
++checks = {
++    "login has Gmail recovery action": "QUÊN MẬT KHẨU?" in login,
++    "request uses registered username email mapping": "usernameToEmail(username)" in auth and "resetPasswordForEmail(" in auth,
++    "recovery uses app deep link": 'redirectUrl = "vn.kholinhkien://auth-callback"' in auth,
++    "new password requires recovery session": "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth,
++    "Auth callback scheme configured": 'scheme = "vn.kholinhkien"' in provider and 'host = "auth-callback"' in provider,
++    "manifest exposes callback activity": 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest,
++    "callback imports Supabase session": "handleDeeplinks(intent)" in recovery,
++}
++for label, passed in checks.items():
++    print(f"{'PASS' if passed else 'FAIL'} | {label}")
++print(f"RESULT: {sum(checks.values())}/{len(checks)} PASS")
++if not all(checks.values()):
++    raise SystemExit(1)
