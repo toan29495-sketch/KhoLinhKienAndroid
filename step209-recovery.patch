@@ -86,7 +86,7 @@ index 0f16dd8..04d94af 100644
 +
          Button(
              onClick = {
-                 if (username.isBlank()) {
+                 if (username.isBlank() || password.isBlank()) {
 diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
 new file mode 100644
 index 0000000..87708d9
