@@ -89,7 +89,7 @@ jobs:
           from pathlib import Path
           p = Path("app/build.gradle.kts")
           s = p.read_text()
-          marker = '    buildFeatures { compose = true }'
+          marker = "android {"
           signing = '''
               signingConfigs {
                   create("release") {
@@ -106,11 +106,11 @@ jobs:
                   }
               }
           '''
-          if s.count(marker) != 1:
-              raise SystemExit("Could not locate the Android buildFeatures insertion point")
           if 'create("release")' in s:
               raise SystemExit("Release signing already configured; refusing duplicate insertion")
-          p.write_text(s.replace(marker, signing + marker, 1))
+          if s.count(marker) != 1:
+              raise SystemExit("Could not locate unique Android DSL block")
+          p.write_text(s.replace(marker, marker + signing, 1))
           PY
           grep -q 'signingConfig = signingConfigs.getByName("release")' app/build.gradle.kts
 
