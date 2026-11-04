@@ -141,5 +141,10 @@
          // Serialize the entire pull run with ZIP import/resume/abort. If a restore
          // owns the gate, leave the cursor untouched and let WorkManager retry later.
 @@ -38,7 +39,6 @@
-         val ownerId = inputData.getString(KEY_OWNER_ID) ?: return Result.success()
+         val ownerId = inputData.getString(KEY_OWNER_ID) ?: return Result.failure()
+         val isAdmin = inputData.getBoolean(KEY_IS_ADMIN, false)
+         val cursorKey = if (isAdmin) "admin-global:$ownerId" else ownerId
+-        val client = SupabaseClientProvider.client
+         return try {
+         val currentUser = client.auth.currentUserOrNull()?.id ?: return Result.success()
          if (currentUser != ownerId) return Result.success()
