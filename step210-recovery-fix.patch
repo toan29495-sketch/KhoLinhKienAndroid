@@ -1,7 +1,7 @@
 diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
 --- a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
 +++ b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
-@@ -1,16 +1,17 @@
+@@ -1,20 +1,22 @@
  package vn.kholinhkien
  
 +import io.github.jan.supabase.auth.FlowType
@@ -27,7 +27,7 @@ diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/sr
 diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
 --- a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
 +++ b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
-@@ -1,17 +1,16 @@
+@@ -1,20 +1,20 @@
  package vn.kholinhkien
  
  import android.os.Bundle
@@ -49,7 +49,7 @@ diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/
  import kotlinx.coroutines.launch
  
  class PasswordRecoveryActivity : ComponentActivity() {
-@@ -23,15 +22,13 @@ class PasswordRecoveryActivity : ComponentActivity() {
+@@ -1,14 +1,14 @@
          val callbackUrl = intent.data?.toString().orEmpty()
          lifecycleScope.launch {
              try {
@@ -70,7 +70,7 @@ diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/
 diff --git a/tools/verify_step209_admin_password_recovery.py b/tools/verify_step209_admin_password_recovery.py
 --- a/tools/verify_step209_admin_password_recovery.py
 +++ b/tools/verify_step209_admin_password_recovery.py
-@@ -13,7 +13,7 @@ checks = {
+@@ -1,5 +1,5 @@
      "new password requires recovery session": "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth,
      "Auth callback scheme configured": 'scheme = "vn.kholinhkien"' in provider and 'host = "auth-callback"' in provider,
      "manifest exposes callback activity": 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest,
