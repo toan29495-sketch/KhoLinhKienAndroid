@@ -1,12 +1,13 @@
 diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
 --- a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
 +++ b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
-@@ -1,16 +1,18 @@
+@@ -1,16 +1,20 @@
  package vn.kholinhkien
  
 +import io.github.jan.supabase.auth.FlowType
  import io.github.jan.supabase.createSupabaseClient
  import io.github.jan.supabase.auth.Auth
++import io.github.jan.supabase.functions.Functions
  import io.github.jan.supabase.postgrest.Postgrest
  import io.github.jan.supabase.storage.Storage
  
@@ -16,10 +17,11 @@ diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/sr
          supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
      ) {
          install(Auth) {
-+            flowType = FlowType.PKCE
+             flowType = FlowType.PKCE
              scheme = "vn.kholinhkien"
              host = "auth-callback"
          }
++        install(Functions)
          install(Postgrest)
          install(Storage)
      }
@@ -30,7 +32,7 @@ diff --git a/tools/verify_step209_admin_password_recovery.py b/tools/verify_step
 @@ -13,7 +13,7 @@
      "new password requires recovery session": "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth,
      "Auth callback scheme configured": 'scheme = "vn.kholinhkien"' in provider and 'host = "auth-callback"' in provider,
++    "Supabase Functions plugin installed for Admin KTV actions": "import io.github.jan.supabase.functions.Functions" in provider and "install(Functions)" in provider,
      "manifest exposes callback activity": 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest,
--    "callback supports PKCE and implicit sessions": "exchangeCodeForSession(authCode)" in recovery and "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery,
-+    "callback supports PKCE and implicit sessions": "exchangeCodeForSession(authCode)" in recovery and "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery and "FlowType.PKCE" in provider,
+     "callback supports PKCE and implicit sessions": "exchangeCodeForSession(authCode)" in recovery and "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery and "FlowType.PKCE" in provider,
  }
