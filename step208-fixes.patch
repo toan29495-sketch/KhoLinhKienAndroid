@@ -1,8 +1,6 @@
-diff --git a/app/src/main/java/vn/kholinhkien/AuthRepository.kt b/app/src/main/java/vn/kholinhkien/AuthRepository.kt
-index b094464..1ba91b4 100644
 --- a/app/src/main/java/vn/kholinhkien/AuthRepository.kt
 +++ b/app/src/main/java/vn/kholinhkien/AuthRepository.kt
-@@ -4,6 +4,7 @@ import io.github.jan.supabase.auth.providers.builtin.Email
+@@ -4,6 +4,7 @@
  import io.github.jan.supabase.auth.auth
  import io.github.jan.supabase.functions.functions
  import io.github.jan.supabase.postgrest.from
@@ -10,22 +8,18 @@ index b094464..1ba91b4 100644
  import kotlinx.coroutines.CancellationException
  import io.ktor.client.call.body
  import kotlinx.serialization.Serializable
-diff --git a/app/src/main/java/vn/kholinhkien/BackupManager.kt b/app/src/main/java/vn/kholinhkien/BackupManager.kt
-index 16ad460..0af6aef 100644
 --- a/app/src/main/java/vn/kholinhkien/BackupManager.kt
 +++ b/app/src/main/java/vn/kholinhkien/BackupManager.kt
-@@ -35,6 +35,10 @@ data class PreparedWeeklyCloudBackup(
+@@ -35,6 +35,8 @@
  )
  
  object BackupManager {
-+    // Downloads provider exposes this optional metadata column, but Android SDK
-+    // does not publish it through MediaStore.MediaColumns on all compile SDKs.
++    // Downloads provider metadata key; not exposed consistently by SDK MediaColumns.
 +    private const val DOWNLOAD_DESCRIPTION_COLUMN = "description"
-+
  
      /**
       * Creates a verified, durable app-private ZIP from one consistent Room snapshot.
-@@ -202,7 +206,7 @@ data class PreparedWeeklyCloudBackup(
+@@ -202,7 +204,7 @@
                  put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                  put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
                  put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
@@ -34,7 +28,7 @@ index 16ad460..0af6aef 100644
                  put(MediaStore.MediaColumns.IS_PENDING, 1)
              }
              val uri = resolver.insert(collection, values) ?: error("Không tạo được tệp sao lưu trong Downloads")
-@@ -282,7 +286,7 @@ data class PreparedWeeklyCloudBackup(
+@@ -282,7 +284,7 @@
          ownerMarker: String,
          nowMillis: Long
      ) {
@@ -43,11 +37,9 @@ index 16ad460..0af6aef 100644
          val staleUris = mutableListOf<android.net.Uri>()
          resolver.query(collection, arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DATE_ADDED), selection,
              arrayOf(relativePath + "/", ownerMarker), null)?.use { cursor ->
-diff --git a/app/src/main/java/vn/kholinhkien/Data.kt b/app/src/main/java/vn/kholinhkien/Data.kt
-index 01bdf2c..2095601 100644
 --- a/app/src/main/java/vn/kholinhkien/Data.kt
 +++ b/app/src/main/java/vn/kholinhkien/Data.kt
-@@ -1197,7 +1197,7 @@ interface InventoryDao {
+@@ -1197,7 +1197,7 @@
              else "Số lượng tồn vượt giới hạn cho phép"
          }
          val after = afterLong.toInt()
@@ -56,11 +48,9 @@ index 01bdf2c..2095601 100644
          val movement = Movement(code = code, partName = part.name, type = type, amount = amount,
              beforeQty = part.quantity, afterQty = after, reason = reason, machineOrStore = machine, ownerId = ownerId, ownerName = ownerName)
          addMovement(movement)
-diff --git a/app/src/main/java/vn/kholinhkien/RestoreCloudSessionSender.kt b/app/src/main/java/vn/kholinhkien/RestoreCloudSessionSender.kt
-index a94b5d3..8a0ba6a 100644
 --- a/app/src/main/java/vn/kholinhkien/RestoreCloudSessionSender.kt
 +++ b/app/src/main/java/vn/kholinhkien/RestoreCloudSessionSender.kt
-@@ -10,7 +10,6 @@ import kotlinx.serialization.json.Json
+@@ -10,7 +10,6 @@
  import kotlinx.serialization.json.buildJsonArray
  import kotlinx.serialization.json.buildJsonObject
  import kotlinx.serialization.json.put
@@ -68,11 +58,9 @@ index a94b5d3..8a0ba6a 100644
  
  /** Creates/resumes the owner-scoped server session and sends durable payload chunks.
   * The live inventory is never modified by this sender; only the server staging tables
-diff --git a/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotApplier.kt b/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotApplier.kt
-index c4a89cf..e1a7dc9 100644
 --- a/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotApplier.kt
 +++ b/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotApplier.kt
-@@ -60,7 +60,7 @@ internal class RestoreCloudSnapshotApplier(
+@@ -60,7 +60,7 @@
              false
          }
  
@@ -81,11 +69,9 @@ index c4a89cf..e1a7dc9 100644
              restoreId = restoreId,
              partCount = journal.partCount,
              movementCount = journal.movementCount,
-diff --git a/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotReader.kt b/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotReader.kt
-index 19ed35e..e1c0801 100644
 --- a/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotReader.kt
 +++ b/app/src/main/java/vn/kholinhkien/RestoreCloudSnapshotReader.kt
-@@ -29,6 +29,10 @@ internal class RestoreCloudSnapshotReader(
+@@ -29,6 +29,10 @@
      private companion object {
          const val MIN_FREE_BYTES_DURING_SNAPSHOT = 16L * 1024L * 1024L
          const val SQLITE_WRITE_MULTIPLIER = 2L
@@ -96,7 +82,7 @@ index 19ed35e..e1c0801 100644
      }
  
      suspend fun download(ownerId: String, restoreId: String): Result {
-@@ -61,7 +65,7 @@ internal class RestoreCloudSnapshotReader(
+@@ -61,7 +65,7 @@
          dao.clearRestoreStagedRowsByType(ownerId, restoreId, SNAPSHOT_PART)
          dao.clearRestoreStagedRowsByType(ownerId, restoreId, SNAPSHOT_MOVEMENT)
  
@@ -105,7 +91,7 @@ index 19ed35e..e1c0801 100644
              val partRows = readEntity(ownerId, restoreId, "PART", SNAPSHOT_PART, localPartChunks, journal)
              val movementRows = readEntity(ownerId, restoreId, "MOVEMENT", SNAPSHOT_MOVEMENT, localMovementChunks, journal)
              require(partRows == journal.partCount) { "Số linh kiện snapshot không khớp journal" }
-@@ -206,10 +210,4 @@ internal class RestoreCloudSnapshotReader(
+@@ -206,10 +210,4 @@
          }
      }
  
@@ -116,11 +102,9 @@ index 19ed35e..e1c0801 100644
 -        const val SNAPSHOT_MOVEMENT = "SNAPSHOT_MOVEMENT"
 -    }
  }
-diff --git a/app/src/main/java/vn/kholinhkien/SyncOutboxSender.kt b/app/src/main/java/vn/kholinhkien/SyncOutboxSender.kt
-index 816ff02..c04a3de 100644
 --- a/app/src/main/java/vn/kholinhkien/SyncOutboxSender.kt
 +++ b/app/src/main/java/vn/kholinhkien/SyncOutboxSender.kt
-@@ -3,6 +3,7 @@ package vn.kholinhkien
+@@ -3,6 +3,7 @@
  import io.github.jan.supabase.auth.auth
  import io.github.jan.supabase.postgrest.postgrest
  import io.github.jan.supabase.storage.storage
@@ -128,7 +112,7 @@ index 816ff02..c04a3de 100644
  import kotlinx.serialization.json.Json
  import kotlinx.serialization.json.buildJsonObject
  import kotlinx.serialization.json.put
-@@ -144,7 +145,7 @@ class SyncOutboxSender(
+@@ -144,7 +145,7 @@
          require(Regex("^[0-9a-fA-F-]{36}$").matches(ownerId)) { "Mã chủ kho không hợp lệ khi tải ảnh" }
          val canonicalFile = file.canonicalFile
          val ownerPendingDir = File(File(appFilesDirectory, "pending_part_photos"), ownerId).canonicalFile
@@ -137,7 +121,7 @@ index 816ff02..c04a3de 100644
          val isOwnerScoped = canonicalFile.parentFile == ownerPendingDir
          // Legacy files are shared-path artifacts from old releases. They may be
          // retried only when Room proves exclusive ownership across parts and outbox.
-@@ -179,7 +180,7 @@ class SyncOutboxSender(
+@@ -179,7 +180,7 @@
          requireActiveOwner(ownerId)
          client.storage.from("part-images").upload(remotePath, photoBytes) {
              upsert = true
@@ -146,11 +130,9 @@ index 816ff02..c04a3de 100644
          }
          // Never publish a photo_path to the parts table based only on the upload
          // response. Read the private object back with the active authenticated session.
-diff --git a/app/src/main/java/vn/kholinhkien/SyncPullWorker.kt b/app/src/main/java/vn/kholinhkien/SyncPullWorker.kt
-index 1f1b321..c0471ad 100644
 --- a/app/src/main/java/vn/kholinhkien/SyncPullWorker.kt
 +++ b/app/src/main/java/vn/kholinhkien/SyncPullWorker.kt
-@@ -23,6 +23,7 @@ import java.io.File
+@@ -23,6 +23,7 @@
  
  /** Pulls the owner's append-only change feed. Cursor advances only after a page event is applied. */
  class SyncPullWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -158,7 +140,7 @@ index 1f1b321..c0471ad 100644
      override suspend fun doWork(): Result {
          // Serialize the entire pull run with ZIP import/resume/abort. If a restore
          // owns the gate, leave the cursor untouched and let WorkManager retry later.
-@@ -38,7 +39,6 @@ class SyncPullWorker(context: Context, params: WorkerParameters) : CoroutineWork
+@@ -38,7 +39,6 @@
          val ownerId = inputData.getString(KEY_OWNER_ID) ?: return Result.failure()
          val isAdmin = inputData.getBoolean(KEY_IS_ADMIN, false)
          val cursorKey = if (isAdmin) "admin-global:$ownerId" else ownerId
