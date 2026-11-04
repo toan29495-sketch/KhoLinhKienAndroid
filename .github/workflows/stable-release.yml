@@ -7,12 +7,12 @@ on:
         description: Android versionCode (must be greater than the installed build)
         required: true
         type: number
-        default: 5
+        default: 6
       version_name:
         description: Human-readable versionName
         required: true
         type: string
-        default: "1.4"
+        default: "1.5"
 
 permissions:
   contents: read
