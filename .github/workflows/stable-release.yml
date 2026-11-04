@@ -123,8 +123,8 @@ jobs:
           if "forced-password profile RLS migration is present" not in v:
               anchor = "for label, passed in checks.items():"
               extra = '''checks["forced-password profile RLS migration is present"] = (root / "supabase/migrations/20261104180000_step211_allow_self_profile_read_during_forced_password_change.sql").is_file()
-checks["empty profile result has actionable message"] = "Không thể tải hồ sơ tài khoản." in auth
-'''
+              checks["empty profile result has actionable message"] = "Không thể tải hồ sơ tài khoản." in auth
+              '''
               if anchor not in v:
                   raise SystemExit("Could not locate Step209 verifier result loop")
               v = v.replace(anchor, extra + anchor, 1)
