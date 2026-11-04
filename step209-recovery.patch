@@ -92,7 +92,7 @@ new file mode 100644
 index 0000000..cbf7d00
 --- /dev/null
 +++ b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,97 @@
 +package vn.kholinhkien
 +
 +import android.os.Bundle
@@ -123,16 +123,8 @@ index 0000000..cbf7d00
 +            try {
 +                require(callbackUrl.isNotBlank()) { "Thiếu liên kết xác thực" }
 +                val auth = SupabaseClientProvider.client.auth
-+                val callbackUri = android.net.Uri.parse(callbackUrl)
-+                val authCode = callbackUri.getQueryParameter("code")
-+                if (!authCode.isNullOrBlank()) {
-+                    // PKCE recovery links return an authorization code in the query string.
-+                    withContext(Dispatchers.IO) { auth.exchangeCodeForSession(authCode) }
-+                } else {
-+                    // Keep compatibility with implicit-flow links that return tokens in the URL fragment.
-+                    val session = withContext(Dispatchers.IO) { auth.parseSessionFromUrl(callbackUrl) }
-+                    withContext(Dispatchers.IO) { auth.importSession(session) }
-+                }
++                val authCode = android.net.Uri.parse(callbackUrl).getQueryParameter("code")
++                if (!authCode.isNullOrBlank()) withContext(Dispatchers.IO) { auth.exchangeCodeForSession(authCode) } else { val session = withContext(Dispatchers.IO) { auth.parseSessionFromUrl(callbackUrl) }; withContext(Dispatchers.IO) { auth.importSession(session) } }
 +                hasRecoverySession = AuthRepository().isLoggedIn()
 +            } catch (_: Exception) {
 +                hasRecoverySession = false
