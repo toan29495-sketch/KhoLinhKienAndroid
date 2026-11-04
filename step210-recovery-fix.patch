@@ -70,7 +70,6 @@ diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/
 diff --git a/tools/verify_step209_admin_password_recovery.py b/tools/verify_step209_admin_password_recovery.py
 --- a/tools/verify_step209_admin_password_recovery.py
 +++ b/tools/verify_step209_admin_password_recovery.py
-undefined
      "new password requires recovery session": "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth,
      "Auth callback scheme configured": 'scheme = "vn.kholinhkien"' in provider and 'host = "auth-callback"' in provider,
      "manifest exposes callback activity": 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest,
