@@ -129,6 +129,36 @@ jobs:
                   raise SystemExit("Could not locate Step209 verifier result loop")
               v = v.replace(anchor, extra + anchor, 1)
           verifier.write_text(v)
+
+          # Rebuild the verifier from a clean, deterministic source. The packed
+          # Step209 patch has previously produced malformed indentation.
+          verifier.write_text("""from pathlib import Path
+
+root = Path(__file__).resolve().parents[1]
+auth = (root / "app/src/main/java/vn/kholinhkien/AuthRepository.kt").read_text()
+login = (root / "app/src/main/java/vn/kholinhkien/LoginScreen.kt").read_text()
+provider = (root / "app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt").read_text()
+manifest = (root / "app/src/main/AndroidManifest.xml").read_text()
+recovery = (root / "app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt").read_text()
+
+checks = [
+    ("login recovery action", "QUÊN MẬT KHẨU?" in login),
+    ("recovery email request", "resetPasswordForEmail(" in auth and "usernameToEmail(username)" in auth),
+    ("recovery redirect", 'redirectUrl = "vn.kholinhkien://auth-callback"' in auth),
+    ("password update requires session", "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth),
+    ("PKCE flow", "FlowType.PKCE" in provider),
+    ("Functions plugin", "install(Functions)" in provider),
+    ("callback manifest", 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest),
+    ("PKCE callback exchange", "exchangeCodeForSession(authCode)" in recovery),
+    ("implicit callback fallback", "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery),
+    ("Step211 migration present", (root / "supabase/migrations/20261104180000_step211_allow_self_profile_read_during_forced_password_change.sql").is_file()),
+    ("empty profile has actionable message", "Không thể tải hồ sơ tài khoản." in auth),
+]
+
+for label, passed in checks:
+    print("{} | {}".format("PASS" if passed else "FAIL", label))
+assert all(passed for _, passed in checks), "One or more release source contracts failed"
+""")
           PY
           git diff --check
 
