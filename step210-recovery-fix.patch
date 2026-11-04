@@ -67,3 +67,13 @@ diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/
                  sessionReady = true
              }
          }
+diff --git a/tools/verify_step209_admin_password_recovery.py b/tools/verify_step209_admin_password_recovery.py
+--- a/tools/verify_step209_admin_password_recovery.py
++++ b/tools/verify_step209_admin_password_recovery.py
+@@ -13,7 +13,7 @@ checks = {
+     "new password requires recovery session": "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth,
+     "Auth callback scheme configured": 'scheme = "vn.kholinhkien"' in provider and 'host = "auth-callback"' in provider,
+     "manifest exposes callback activity": 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest,
+-    "callback supports PKCE and implicit sessions": "exchangeCodeForSession(authCode)" in recovery and "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery,
++    "callback uses SDK deep-link handler": "handleDeeplinks(intent)" in recovery and "FlowType.PKCE" in provider,
+ }
