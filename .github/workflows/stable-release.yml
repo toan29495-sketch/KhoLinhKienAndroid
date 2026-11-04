@@ -45,8 +45,44 @@ jobs:
           git apply step208-fixes.patch
           git apply --check step209-recovery.patch
           git apply step209-recovery.patch
-          git apply --recount --check step210-recovery-fix.patch
-          git apply --recount step210-recovery-fix.patch
+          # Apply Step210 recovery and Functions plugin changes directly to the extracted source.
+          # This avoids brittle unified-diff context against the packed Step208 baseline.
+          python - <<'PY'
+          from pathlib import Path
+          provider = Path("app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt")
+          source = provider.read_text()
+          if "import io.github.jan.supabase.functions.Functions" not in source:
+              anchor = "import io.github.jan.supabase.auth.Auth"
+              if anchor not in source:
+                  raise SystemExit("Could not locate Supabase Auth import")
+              source = source.replace(anchor, anchor + "\\nimport io.github.jan.supabase.functions.Functions", 1)
+          if "import io.github.jan.supabase.auth.FlowType" not in source:
+              anchor = "import io.github.jan.supabase.auth.Auth"
+              source = source.replace(anchor, "import io.github.jan.supabase.auth.FlowType\\n" + anchor, 1)
+          if "flowType = FlowType.PKCE" not in source:
+              anchor = "install(Auth) {"
+              if anchor not in source:
+                  raise SystemExit("Could not locate Auth plugin configuration")
+              source = source.replace(anchor, anchor + "\\n            flowType = FlowType.PKCE", 1)
+          if "install(Functions)" not in source:
+              anchor = "install(Auth) {"
+              end = source.find("\\n        }", source.find(anchor))
+              if end < 0:
+                  raise SystemExit("Could not locate end of Auth plugin configuration")
+              source = source[:end + len("\\n        }")] + "\\n        install(Functions)" + source[end + len("\\n        }"):]
+          provider.write_text(source)
+          verifier = Path("tools/verify_step209_admin_password_recovery.py")
+          v = verifier.read_text()
+          check = '    "Supabase Functions plugin installed for Admin KTV actions": "import io.github.jan.supabase.functions.Functions" in provider and "install(Functions)" in provider,\\n'
+          if "Supabase Functions plugin installed for Admin KTV actions" not in v:
+              anchor = '    "manifest exposes callback activity":'
+              if anchor not in v:
+                  raise SystemExit("Could not locate Step209 verifier insertion point")
+              v = v.replace(anchor, check + anchor, 1)
+          if "FlowType.PKCE" not in v:
+              v = v.replace('"auth.importSession(session)" in recovery,', '"auth.importSession(session)" in recovery and "FlowType.PKCE" in provider,', 1)
+          verifier.write_text(v)
+          PY
           git diff --check
 
       - name: Set up JDK 17
