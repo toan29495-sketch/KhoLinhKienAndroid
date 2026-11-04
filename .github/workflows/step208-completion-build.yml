@@ -83,6 +83,14 @@ jobs:
             python "$f"
           done
 
+      - name: Preserve exact source archive for diagnosis
+        uses: actions/upload-artifact@v4
+        with:
+          name: Step208-source-diagnostic
+          path: Step208-source.zip
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Compile Kotlin and build debug APK
         run: ./gradlew --no-daemon --stacktrace :app:compileDebugKotlin :app:assembleDebug
 
