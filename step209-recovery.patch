@@ -188,7 +188,7 @@ new file mode 100644
 index 0000000..2ea7b7f
 --- /dev/null
 +++ b/tools/verify_step209_admin_password_recovery.py
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,20 @@
 +from pathlib import Path
 +
 +root = Path(__file__).resolve().parents[1]
@@ -209,5 +209,4 @@ index 0000000..2ea7b7f
 +for label, passed in checks.items():
 +    print(f"{'PASS' if passed else 'FAIL'} | {label}")
 +print(f"RESULT: {sum(checks.values())}/{len(checks)} PASS")
-+if not all(checks.values()):
-+    raise SystemExit(1)
++assert all(checks.values())
