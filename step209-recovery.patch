@@ -92,7 +92,7 @@ new file mode 100644
 index 0000000..cbf7d00
 --- /dev/null
 +++ b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,110 @@
 +package vn.kholinhkien
 +
 +import android.os.Bundle
@@ -123,8 +123,16 @@ index 0000000..cbf7d00
 +            try {
 +                require(callbackUrl.isNotBlank()) { "Thiếu liên kết xác thực" }
 +                val auth = SupabaseClientProvider.client.auth
-+                val session = withContext(Dispatchers.IO) { auth.parseSessionFromUrl(callbackUrl) }
-+                withContext(Dispatchers.IO) { auth.importSession(session) }
++                val callbackUri = android.net.Uri.parse(callbackUrl)
++                val authCode = callbackUri.getQueryParameter("code")
++                if (!authCode.isNullOrBlank()) {
++                    // PKCE recovery links return an authorization code in the query string.
++                    withContext(Dispatchers.IO) { auth.exchangeCodeForSession(authCode) }
++                } else {
++                    // Keep compatibility with implicit-flow links that return tokens in the URL fragment.
++                    val session = withContext(Dispatchers.IO) { auth.parseSessionFromUrl(callbackUrl) }
++                    withContext(Dispatchers.IO) { auth.importSession(session) }
++                }
 +                hasRecoverySession = AuthRepository().isLoggedIn()
 +            } catch (_: Exception) {
 +                hasRecoverySession = false
@@ -227,7 +235,7 @@ index 0000000..2ea7b7f
 +    "new password requires recovery session": "check(isLoggedIn())" in auth and "updateUser { password = newPassword }" in auth,
 +    "Auth callback scheme configured": 'scheme = "vn.kholinhkien"' in provider and 'host = "auth-callback"' in provider,
 +    "manifest exposes callback activity": 'android:name=".PasswordRecoveryActivity"' in manifest and "android.intent.category.BROWSABLE" in manifest,
-+    "callback imports Supabase session": "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery,
++    "callback supports PKCE and implicit sessions": "exchangeCodeForSession(authCode)" in recovery and "parseSessionFromUrl(callbackUrl)" in recovery and "auth.importSession(session)" in recovery,
 +}
 +for label, passed in checks.items():
 +    print(f"{'PASS' if passed else 'FAIL'} | {label}")
