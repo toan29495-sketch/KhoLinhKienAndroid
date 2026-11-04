@@ -55,25 +55,25 @@ jobs:
               anchor = "import io.github.jan.supabase.auth.Auth"
               if anchor not in source:
                   raise SystemExit("Could not locate Supabase Auth import")
-              source = source.replace(anchor, anchor + "\\nimport io.github.jan.supabase.functions.Functions", 1)
+              source = source.replace(anchor, anchor + "\nimport io.github.jan.supabase.functions.Functions", 1)
           if "import io.github.jan.supabase.auth.FlowType" not in source:
               anchor = "import io.github.jan.supabase.auth.Auth"
-              source = source.replace(anchor, "import io.github.jan.supabase.auth.FlowType\\n" + anchor, 1)
+              source = source.replace(anchor, "import io.github.jan.supabase.auth.FlowType\n" + anchor, 1)
           if "flowType = FlowType.PKCE" not in source:
               anchor = "install(Auth) {"
               if anchor not in source:
                   raise SystemExit("Could not locate Auth plugin configuration")
-              source = source.replace(anchor, anchor + "\\n            flowType = FlowType.PKCE", 1)
+              source = source.replace(anchor, anchor + "\n            flowType = FlowType.PKCE", 1)
           if "install(Functions)" not in source:
               anchor = "install(Auth) {"
-              end = source.find("\\n        }", source.find(anchor))
+              end = source.find("\n        }", source.find(anchor))
               if end < 0:
                   raise SystemExit("Could not locate end of Auth plugin configuration")
-              source = source[:end + len("\\n        }")] + "\\n        install(Functions)" + source[end + len("\\n        }"):]
+              source = source[:end + len("\n        }")] + "\n        install(Functions)" + source[end + len("\n        }"):]
           provider.write_text(source)
           verifier = Path("tools/verify_step209_admin_password_recovery.py")
           v = verifier.read_text()
-          check = '    "Supabase Functions plugin installed for Admin KTV actions": "import io.github.jan.supabase.functions.Functions" in provider and "install(Functions)" in provider,\\n'
+          check = '    "Supabase Functions plugin installed for Admin KTV actions": "import io.github.jan.supabase.functions.Functions" in provider and "install(Functions)" in provider,\n'
           if "Supabase Functions plugin installed for Admin KTV actions" not in v:
               anchor = '    "manifest exposes callback activity":'
               if anchor not in v:
