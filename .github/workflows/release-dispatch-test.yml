@@ -1,0 +1,10 @@
+name: KhoLinhKien Release Dispatch Test
+on: [workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  dispatch_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm GitHub dispatch is registered
+        run: echo "GitHub workflow_dispatch is available."
