@@ -1,0 +1,69 @@
+diff --git a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
+--- a/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
++++ b/app/src/main/java/vn/kholinhkien/SupabaseClientProvider.kt
+@@ -1,16 +1,17 @@
+ package vn.kholinhkien
+ 
++import io.github.jan.supabase.auth.FlowType
+ import io.github.jan.supabase.createSupabaseClient
+ import io.github.jan.supabase.auth.Auth
+ import io.github.jan.supabase.postgrest.Postgrest
+ import io.github.jan.supabase.storage.Storage
+ 
+ object SupabaseClientProvider {
+     val client = createSupabaseClient(
+         supabaseUrl = BuildConfig.SUPABASE_URL,
+         supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
+     ) {
+         install(Auth) {
++            flowType = FlowType.PKCE
+             scheme = "vn.kholinhkien"
+             host = "auth-callback"
+         }
+         install(Postgrest)
+         install(Storage)
+     }
+ }
+diff --git a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
+--- a/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
++++ b/app/src/main/java/vn/kholinhkien/PasswordRecoveryActivity.kt
+@@ -1,17 +1,16 @@
+ package vn.kholinhkien
+ 
+ import android.os.Bundle
+ import androidx.activity.ComponentActivity
+ import androidx.activity.compose.setContent
+ import androidx.compose.foundation.layout.*
+ import androidx.compose.material3.*
+ import androidx.compose.runtime.*
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.text.input.PasswordVisualTransformation
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.lifecycleScope
+ import io.github.jan.supabase.auth.auth
+-import io.github.jan.supabase.auth.parseSessionFromUrl
++import io.github.jan.supabase.handleDeeplinks
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.withContext
+ import kotlinx.coroutines.launch
+ 
+ class PasswordRecoveryActivity : ComponentActivity() {
+@@ -23,15 +22,13 @@ class PasswordRecoveryActivity : ComponentActivity() {
+         val callbackUrl = intent.data?.toString().orEmpty()
+         lifecycleScope.launch {
+             try {
+                 require(callbackUrl.isNotBlank()) { "Thiếu liên kết xác thực" }
+-                val auth = SupabaseClientProvider.client.auth
+-                val authCode = android.net.Uri.parse(callbackUrl).getQueryParameter("code")
+-                if (!authCode.isNullOrBlank()) withContext(Dispatchers.IO) { auth.exchangeCodeForSession(authCode) } else { val session = withContext(Dispatchers.IO) { auth.parseSessionFromUrl(callbackUrl) }; withContext(Dispatchers.IO) { auth.importSession(session) } }
++                withContext(Dispatchers.IO) {
++                    SupabaseClientProvider.client.handleDeeplinks(intent)
++                }
+                 hasRecoverySession = AuthRepository().isLoggedIn()
+             } catch (_: Exception) {
+                 hasRecoverySession = false
+             } finally {
+                 sessionReady = true
+             }
+         }
