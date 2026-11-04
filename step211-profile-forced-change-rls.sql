@@ -1,9 +1,14 @@
 -- Step211: allow an active user to read only their own profile while a
 -- forced password change is pending. Operational tables and RPCs continue to
--- use is_active_profile(), which also requires must_change_password = false.
+-- use public.is_active_profile(), which also requires must_change_password = false.
 begin;
 
-create or replace function public.is_active_account()
+-- Keep the SECURITY DEFINER helper outside the exposed public API schema.
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
+
+create or replace function private.is_active_account()
 returns boolean
 language sql
 stable
@@ -18,20 +23,18 @@ as $$
   );
 $$;
 
--- This helper is only needed by the profiles RLS policy.
-revoke all privileges on function public.is_active_account() from public, anon;
-grant execute on function public.is_active_account() to authenticated;
+revoke all privileges on function private.is_active_account() from public, anon;
+grant execute on function private.is_active_account() to authenticated;
 
--- A forced-password-change account must be able to read its own profile to
--- discover the pending flag, but must not gain access to operational data.
+-- A forced-password-change account can read its own profile to discover the
+-- pending flag, but does not gain access to operational tables.
 drop policy if exists require_active_profile on public.profiles;
-
 create policy require_active_profile
 on public.profiles
 as restrictive
 for select
 to authenticated
-using (public.is_active_account());
+using (private.is_active_account());
 
 -- Preserve the previous active-profile gate for profile mutations.
 create policy require_active_profile_insert
