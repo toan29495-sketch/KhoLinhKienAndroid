@@ -105,13 +105,13 @@ jobs:
           auth_repo = Path("app/src/main/java/vn/kholinhkien/AuthRepository.kt")
           auth_text = auth_repo.read_text()
           old_profile_query = '''        val profile = client.from("profiles").select {
-            filter { eq("id", userId) }
-        }.decodeSingle<UserProfile>()'''
+                      filter { eq("id", userId) }
+                  }.decodeSingle<UserProfile>()'''
           new_profile_query = '''        val profiles = client.from("profiles").select {
             filter { eq("id", userId) }
-        }.decodeList<UserProfile>()
-        val profile = profiles.firstOrNull()
-            ?: throw IllegalStateException("Không thể tải hồ sơ tài khoản. Hãy kiểm tra quyền đọc hồ sơ hoặc liên hệ Admin.")'''
+                  }.decodeList<UserProfile>()
+                  val profile = profiles.firstOrNull()
+                      ?: throw IllegalStateException("Không thể tải hồ sơ tài khoản. Hãy kiểm tra quyền đọc hồ sơ hoặc liên hệ Admin.")'''
           if old_profile_query in auth_text:
               auth_text = auth_text.replace(old_profile_query, new_profile_query, 1)
           elif "Không thể tải hồ sơ tài khoản." not in auth_text:
