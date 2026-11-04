@@ -18,8 +18,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install actionlint
-        uses: reviewdog/action-actionlint@v1
-
-      - name: Validate complete stable release workflow
-        run: actionlint -color .github/workflows/stable-release.yml
+      - name: Validate release workflow with actionlint
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work rhysd/actionlint:latest -color .github/workflows/stable-release.yml
