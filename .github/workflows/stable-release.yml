@@ -72,19 +72,47 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          for name in SUPABASE_URL SUPABASE_PUBLISHABLE_KEY ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for name in SUPABASE_URL SUPABASE_PUBLISHABLE_KEY RELEASE_KEYSTORE_BASE64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
             test -n "${!name}" || { echo "::error::Missing GitHub Actions secret: $name"; exit 1; }
           done
           printf 'SUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release-key.jks
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-key.jks
           test -s release-key.jks
-          keytool -list -keystore release-key.jks -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
+          keytool -list -keystore release-key.jks -storepass "$RELEASE_KEYSTORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS" >/dev/null
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("app/build.gradle.kts")
+          s = p.read_text()
+          marker = '    buildFeatures { compose = true }'
+          signing = '''
+              signingConfigs {
+                  create("release") {
+                      storeFile = file("../release-key.jks")
+                      storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                      keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                      keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  getByName("release") {
+                      signingConfig = signingConfigs.getByName("release")
+                      isMinifyEnabled = false
+                  }
+              }
+          '''
+          if s.count(marker) != 1:
+              raise SystemExit("Could not locate the Android buildFeatures insertion point")
+          if 'create("release")' in s:
+              raise SystemExit("Release signing already configured; refusing duplicate insertion")
+          p.write_text(s.replace(marker, signing + marker, 1))
+          PY
+          grep -q 'signingConfig = signingConfigs.getByName("release")' app/build.gradle.kts
 
       - name: Apply release version
         env:
@@ -101,10 +129,10 @@ jobs:
           name = os.environ["VERSION_NAME"]
           if code < 4:
               raise SystemExit("versionCode must be >= 4 for the Step209 baseline")
-          if not re.fullmatch(r"[0-9]+(?:\\.[0-9A-Za-z-]+)*", name):
+          if not re.fullmatch(r"[0-9]+(?:\.[0-9A-Za-z-]+)*", name):
               raise SystemExit("Invalid versionName")
-          s, n1 = re.subn(r"versionCode\\s*=\\s*\\d+", f"versionCode = {code}", s, count=1)
-          s, n2 = re.subn(r'versionName\\s*=\\s*"[^"]+"', f'versionName = "{name}"', s, count=1)
+          s, n1 = re.subn(r"versionCode\s*=\s*\d+", f"versionCode = {code}", s, count=1)
+          s, n2 = re.subn(r'versionName\s*=\s*"[^"]+"', f'versionName = "{name}"', s, count=1)
           if n1 != 1 or n2 != 1:
               raise SystemExit("Could not safely update versionCode/versionName")
           p.write_text(s)
@@ -123,6 +151,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build signed release APK
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon --stacktrace :app:compileReleaseKotlin :app:assembleRelease
 
       - name: Verify APK signature and calculate checksum
