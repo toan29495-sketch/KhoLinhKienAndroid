@@ -8,6 +8,7 @@ on:
     paths:
       - Step208-source.zip
       - step208-fixes.patch
+      - step209-recovery.patch
       - .github/workflows/step208-completion-build.yml
 
 permissions:
@@ -40,6 +41,8 @@ jobs:
           test -x ./gradlew
           git apply --check step208-fixes.patch
           git apply step208-fixes.patch
+          git apply --check step209-recovery.patch
+          git apply step209-recovery.patch
           git diff --check
 
       - name: Set up JDK 17
@@ -86,11 +89,12 @@ jobs:
             test -f "$f" || continue
             python "$f"
           done
+          python tools/verify_step209_admin_password_recovery.py
 
       - name: Preserve exact source archive for diagnosis
         uses: actions/upload-artifact@v4
         with:
-          name: Step208-source-diagnostic
+          name: Step209-source-diagnostic
           path: Step208-source.zip
           if-no-files-found: error
           retention-days: 7
@@ -104,7 +108,7 @@ jobs:
       - name: Upload APK and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: KhoLinhKien-Step208-debug-validation
+          name: KhoLinhKien-Step209-recovery-debug
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/debug/app-debug.apk.sha256
