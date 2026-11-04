@@ -7,6 +7,7 @@ on:
       - work/step208-completion-build
     paths:
       - Step208-source.zip
+      - .github/workflows/step208-completion-build.yml
 
 permissions:
   contents: read
@@ -53,6 +54,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The legacy SDK package "tools" is no longer published. Install only platform-tools.
+          packages: "platform-tools"
 
       - name: Configure Supabase client values
         env:
@@ -61,7 +65,7 @@ jobs:
         run: |
           test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL repository secret"; exit 1; }
           test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "Missing SUPABASE_PUBLISHABLE_KEY repository secret"; exit 1; }
-          printf 'SUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+          printf 'SUPABASE_URL=%s\\nSUPABASE_PUBLISHABLE_KEY=%s\\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
 
       - name: Install Android SDK components
         run: |
