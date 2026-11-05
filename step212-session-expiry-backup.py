@@ -63,7 +63,7 @@ work.write_text(s)
 
 main = JAVA / "MainActivity.kt"
 s = main.read_text()
-old = "val restored = withContext(Dispatchers.IO) { authRepository.getCurrentProfile() }\n                    currentProfile = restored"
+old = "val restored = withContext(Dispatchers.IO) { authRepository.getCurrentProfile() }\n                currentProfile = restored"
 new = """if (SessionExpiryPolicy.isExpired(context, restoringOwnerId)) {
                         if (isCanonicalOwnerId(restoringOwnerId)) {
                             SyncWorkScheduler.cancelOwner(context, restoringOwnerId)
