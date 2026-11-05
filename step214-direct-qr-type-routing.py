@@ -27,11 +27,12 @@ if start in source:
 elif "Chưa tìm thấy mã trong kho" in source:
     raise SystemExit("Step214: found unknown-QR dialog but could not locate its full block")
 old = '                pendingUnknownQrCode = scanned\\n'
-new = '''                if classifyQrCodeType(scanned) == QrCodeType.DEVICE:
-                    machineHistoryCode = scanned
-                else:
-                    prefillCode = scanned
-                    showAdd = True
+new = '''            } else if (classifyQrCodeType(scanned) == QrCodeType.DEVICE) {
+                machineHistoryCode = scanned
+            } else {
+                prefillCode = scanned
+                showAdd = true
+            }
 '''
 if old in source:
     source = source.replace(old, new, 1)
