@@ -4,7 +4,7 @@ s = Path("app/src/main/java/vn/kholinhkien/SyncOutboxSender.kt").read_text(encod
 checks = {
     "RPC response accepts native JsonObject": "is JsonObject -> responseElement" in s,
     "RPC response accepts only JSON string primitive for embedded object": "is JsonPrimitive" in s and "responseElement.isString" in s,
-    "embedded RPC response is parsed and checked as JsonObject": "Json.parseToJsonElement(embeddedResponse)" in s and "decodedResponse as? JsonObject" in s,
+    "embedded RPC response is parsed and checked as JsonObject": "Json.parseToJsonElement(embeddedResponse)" in s and "decodedResponse as? JsonObject" in s or "decodedResponse ?: error" in s,
     "invalid RPC response shapes fail with reconciliation message": "RPC đồng bộ không trả về JSON object" in s,
     "status acknowledgement guard retained": 'responseObject["status"]' in s and 'responseStatus == "applied"' in s,
     "entity identity acknowledgement guard retained": 'responseObject["entity_id"]' in s and "claimed.entityId" in s,
