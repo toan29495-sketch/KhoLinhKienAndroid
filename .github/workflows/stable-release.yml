@@ -1,4 +1,4 @@
-name: KhoLinhKien stable release
+name: KhoLinhKien stable release # Step216 photo/QR success-dialog suppression
 
 on:
   push:
