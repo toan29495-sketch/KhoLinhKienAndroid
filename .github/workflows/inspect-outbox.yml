@@ -10,20 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Print exact sync source
+      - name: Inspect backup UI sync hooks
         shell: bash
         run: |
           python3 - <<'PY'
-          import zipfile
+          import zipfile,re
           z=zipfile.ZipFile('Step208-source.zip')
-          for suffix in ('SyncOutboxSender.kt','SyncWork.kt'):
-              n=next(x for x in z.namelist() if x.endswith(suffix))
-              print('FILE_BEGIN:',n)
-              print(z.read(n).decode('utf-8'))
-              print('FILE_END:',n)
-          n=next(x for x in z.namelist() if x.endswith('Data.kt'))
+          n=next(x for x in z.namelist() if x.endswith('MainActivity.kt'))
           lines=z.read(n).decode('utf-8').splitlines()
-          for a,b in ((145,190),(265,305),(735,780)):
-              print(f'DATA_LINES_{a}_{b}')
-              for i in range(a-1,min(b,len(lines))): print(f'{i+1}: {lines[i]}')
+          pats=re.compile(r'Làm mới|SyncWorkScheduler\.schedule|fun Tools|ToolsBackup|pendingOutbox|Đồng bộ|Tổng chưa đồng bộ|FAILED',re.I)
+          for i,line in enumerate(lines):
+              if pats.search(line):
+                  print(f'--- MATCH {i+1} ---')
+                  for j in range(max(0,i-10),min(len(lines),i+16)):
+                      print(f'{j+1}: {lines[j]}')
           PY
