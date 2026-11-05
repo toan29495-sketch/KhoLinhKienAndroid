@@ -49,17 +49,17 @@ s = login.read_text()
 # Step212 compile fix: expose the Android Context to the login callback.
 local_context_import = "import androidx.compose.ui.platform.LocalContext"
 if local_context_import not in s:
-    package_end = s.find("\\n", s.find("package "))
+    package_end = s.find("\n", s.find("package "))
     if package_end < 0:
         raise SystemExit("Step212: cannot locate LoginScreen package declaration")
-    s = s[:package_end + 1] + "\\n" + local_context_import + s[package_end + 1:]
+    s = s[:package_end + 1] + "\n" + local_context_import + s[package_end + 1:]
 
-if not re.search(r"\\bval\\s+context\\s*=\\s*LocalContext\\.current\\b", s):
-    screen_fun = re.search(r"(@Composable\\s+fun\\s+LoginScreen\\s*\\([^)]*\\)\\s*\\{)", s, re.S)
+if not re.search(r"\bval\s+context\s*=\s*LocalContext\.current\b", s):
+    screen_fun = re.search(r"(@Composable\s+fun\s+LoginScreen\s*\([^)]*\)\s*\{)", s, re.S)
     if not screen_fun:
         raise SystemExit("Step212: cannot locate LoginScreen composable declaration for Context")
     insert_at = screen_fun.end()
-    s = s[:insert_at] + "\\n    val context = LocalContext.current" + s[insert_at:]
+    s = s[:insert_at] + "\n    val context = LocalContext.current" + s[insert_at:]
 old = "repository.signIn(username, password)\n                            repository.getCurrentProfile()"
 new = "repository.signIn(username, password)\n                            repository.currentUserId()?.let { SessionExpiryPolicy.markAuthenticated(context, it) }\n                            repository.getCurrentProfile()"
 if old in s:
