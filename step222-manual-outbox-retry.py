@@ -134,23 +134,26 @@ with tempfile.TemporaryDirectory() as td:
     live_main_text = live_main.read_text()
     archive_main_text = main.read_text()
     ui_anchor = '        Text("Công cụ", style = MaterialTheme.typography.titleLarge)'
-    ui_start = archive_main_text.find(ui_anchor)
-    ui_end_marker = '        Text("Đồng bộ ngay")'
-    ui_end = archive_main_text.find(ui_end_marker, ui_start)
     if "Đồng bộ ngay" not in live_main_text:
-        if ui_start < 0 or ui_end < 0:
-            raise SystemExit("Cannot isolate Step222 UI block from archive")
-        # Copy only the newly added card, not the surrounding Compose screen.
-        card_start = archive_main_text.find("        var manualSyncBusy", ui_start)
+        lines = archive_main_text.splitlines()
+        card_start = next((i for i, line in enumerate(lines) if line.startswith("        var manualSyncBusy")), -1)
         if card_start < 0:
             raise SystemExit("Cannot locate Step222 card start")
-        card_end = archive_main_text.find("\n        }", ui_end)
-        if card_end < 0:
-            raise SystemExit("Cannot locate Step222 card end")
-        card = archive_main_text[card_start:card_end + len("\n        }")]
+        depth = 0
+        seen_open = False
+        card_lines = []
+        for line in lines[card_start:]:
+            card_lines.append(line)
+            depth += line.count("{") - line.count("}")
+            seen_open = seen_open or "{" in line
+            if seen_open and depth == 0:
+                break
+        else:
+            raise SystemExit("Cannot find balanced end of Step222 card")
+        card = "\\n".join(card_lines)
         if live_main_text.count(ui_anchor) != 1:
             raise SystemExit("Cannot locate unique live ToolsScreen title")
-        live_main_text = live_main_text.replace(ui_anchor, ui_anchor + "\n" + card, 1)
+        live_main_text = live_main_text.replace(ui_anchor, ui_anchor + "\\n" + card, 1)
     live_main.write_text(live_main_text)
 
     if "fun scheduleManual(context: Context, ownerId: String)" not in live_sync.read_text():
