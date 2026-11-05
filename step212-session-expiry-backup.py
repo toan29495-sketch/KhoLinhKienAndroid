@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Apply Step212: absolute 30-day session expiry and 30-day automatic cloud backup."""
 from pathlib import Path
+import re
 
 ROOT = Path(".")
 JAVA = ROOT / "app/src/main/java/vn/kholinhkien"
