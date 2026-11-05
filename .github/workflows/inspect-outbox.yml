@@ -10,31 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract DAO and worker definitions
+      - name: Print exact sync source
         shell: bash
         run: |
           python3 - <<'PY'
-          import zipfile,re
+          import zipfile
           z=zipfile.ZipFile('Step208-source.zip')
-          names=z.namelist()
-          for n in names:
-              if any(t in n.lower() for t in ('dao','worker','scheduler','database')):
-                  print('CANDIDATE:',n)
-          for n in names:
-              if n.endswith('.kt'):
-                  s=z.read(n).decode('utf-8',errors='replace')
-                  if any(t in s for t in ('pendingOutbox','claimOutboxForSend','markOutboxFailed','recoverExpiredClaims','class SyncWorker','object SyncWorkScheduler')):
-                      print('FILE_BEGIN:',n)
-                      lines=s.splitlines()
-                      pats=re.compile(r'pendingOutbox|claimOutboxForSend|markOutboxFailed|recoverExpiredClaims|class SyncWorker|object SyncWorkScheduler|Outbox.*(Pending|Failed|Claim)|status.*(PENDING|FAILED)',re.I)
-                      keep=set()
-                      for i,line in enumerate(lines):
-                          if pats.search(line):
-                              keep.update(range(max(0,i-8),min(len(lines),i+16)))
-                      last=-2
-                      for i in sorted(keep):
-                          if i>last+1: print('...')
-                          print(f'{i+1}: {lines[i]}')
-                          last=i
-                      print('FILE_END:',n)
+          for suffix in ('SyncOutboxSender.kt','SyncWork.kt'):
+              n=next(x for x in z.namelist() if x.endswith(suffix))
+              print('FILE_BEGIN:',n)
+              print(z.read(n).decode('utf-8'))
+              print('FILE_END:',n)
+          n=next(x for x in z.namelist() if x.endswith('Data.kt'))
+          lines=z.read(n).decode('utf-8').splitlines()
+          for a,b in ((145,190),(265,305),(735,780)):
+              print(f'DATA_LINES_{a}_{b}')
+              for i in range(a-1,min(b,len(lines))): print(f'{i+1}: {lines[i]}')
           PY
