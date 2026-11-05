@@ -11,10 +11,10 @@ postgrest_imports = [
 ]
 missing_imports = [line for line in postgrest_imports if line not in s]
 if missing_imports:
-    package_end = s.find("\\n", s.find("package "))
+    package_end = s.find("\n", s.find("package "))
     if package_end < 0:
         raise SystemExit("Step221: package declaration not found; cannot add PostgREST imports")
-    s = s[:package_end + 1] + "\\n".join(missing_imports) + "\\n" + s[package_end + 1:]
+    s = s[:package_end + 1] + "\n".join(missing_imports) + "\n" + s[package_end + 1:]
 old = '''                    is JsonPrimitive -> {
                         require(responseElement.isString) {
                             "RPC đồng bộ trả về giá trị JSON không phải object; giữ giao dịch để đối soát"
