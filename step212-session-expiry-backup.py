@@ -51,12 +51,12 @@ if context_import not in s:
     anchor = "import androidx.compose.runtime.*"
     if anchor not in s:
         raise SystemExit("Step212: cannot locate Compose runtime imports in LoginScreen.kt")
-    s = s.replace(anchor, anchor + "\\n" + context_import, 1)
+    s = s.replace(anchor, anchor + "\n" + context_import, 1)
 if "val context = LocalContext.current" not in s:
-    anchor = "fun LoginScreen(\\n    onLoginSuccess: (UserProfile) -> Unit\\n) {"
+    anchor = "fun LoginScreen(\n    onLoginSuccess: (UserProfile) -> Unit\n) {"
     if anchor not in s:
         raise SystemExit("Step212: cannot locate LoginScreen composable body")
-    s = s.replace(anchor, anchor + "\\n    val context = LocalContext.current", 1)
+    s = s.replace(anchor, anchor + "\n    val context = LocalContext.current", 1)
 login.write_text(s)
 old = "repository.signIn(username, password)\n                            repository.getCurrentProfile()"
 new = "repository.signIn(username, password)\n                            repository.currentUserId()?.let { SessionExpiryPolicy.markAuthenticated(context, it) }\n                            repository.getCurrentProfile()"
