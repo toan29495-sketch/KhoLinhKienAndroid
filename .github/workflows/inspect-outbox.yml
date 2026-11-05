@@ -10,19 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract sender source from baseline ZIP
+      - name: Extract sync DAO and worker source
         shell: bash
         run: |
           python3 - <<'PY'
           import zipfile
           z=zipfile.ZipFile('Step208-source.zip')
-          matches=[n for n in z.namelist() if n.endswith('/SyncOutboxSender.kt') or n.endswith('SyncOutboxSender.kt')]
-          print('MATCHES:', matches)
-          if not matches:
-              raise SystemExit('SyncOutboxSender.kt not found in baseline ZIP')
-          data=z.read(matches[0]).decode('utf-8')
-          print('SOURCE_BEGIN')
-          for i,line in enumerate(data.splitlines(),1):
-              print(f'{i}: {line}')
-          print('SOURCE_END')
+          wanted=('InventoryDao.kt','SyncWorkScheduler.kt','SyncWorker.kt','InventorySyncWorker.kt','SyncOutboxWorker.kt','MainActivity.kt')
+          for name in z.namelist():
+              if name.split('/')[-1] in wanted:
+                  data=z.read(name).decode('utf-8')
+                  print('FILE_BEGIN:',name)
+                  for i,line in enumerate(data.splitlines(),1):
+                      print(f'{i}: {line}')
+                  print('FILE_END:',name)
           PY
