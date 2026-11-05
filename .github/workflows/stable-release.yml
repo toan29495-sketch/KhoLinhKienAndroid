@@ -233,7 +233,7 @@ jobs:
           done
           python tools/verify_step209_admin_password_recovery.py
           python tools/verify_step212_session_expiry_backup.py
-          python tools/verify_step213_qr_routing_and_camera_guard.py
+          # Step214 supersedes Step213's intermediate-dialog contract; run the Step214 verifier instead.
           python tools/verify_step214_direct_qr_type_routing.py
 
       - name: Set up Gradle
