@@ -171,7 +171,7 @@ with tempfile.TemporaryDirectory() as td:
     if "manualSyncBusy" not in live_main_text:
         if live_main_text.count(ui_anchor) != 1:
             raise SystemExit("Cannot locate unique live ToolsScreen title")
-        live_main_text = live_main_text.replace(ui_anchor, ui_anchor + "\\n" + live_ui, 1)
+        live_main_text = live_main_text.replace(ui_anchor, ui_anchor + "\n" + live_ui, 1)
     live_main.write_text(live_main_text)
 
     if "fun scheduleManual(context: Context, ownerId: String)" not in live_sync.read_text():
