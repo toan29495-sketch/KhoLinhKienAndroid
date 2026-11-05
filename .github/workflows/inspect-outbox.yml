@@ -1,0 +1,28 @@
+name: Inspect outbox sender source
+on:
+  push:
+    branches:
+      - inspect/outbox-sender-source
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract sender source from baseline ZIP
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          z=zipfile.ZipFile('Step208-source.zip')
+          matches=[n for n in z.namelist() if n.endswith('/SyncOutboxSender.kt') or n.endswith('SyncOutboxSender.kt')]
+          print('MATCHES:', matches)
+          if not matches:
+              raise SystemExit('SyncOutboxSender.kt not found in baseline ZIP')
+          data=z.read(matches[0]).decode('utf-8')
+          print('SOURCE_BEGIN')
+          for i,line in enumerate(data.splitlines(),1):
+              print(f'{i}: {line}')
+          print('SOURCE_END')
+          PY
