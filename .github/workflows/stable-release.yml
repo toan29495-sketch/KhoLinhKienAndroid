@@ -10,12 +10,12 @@ on:
         description: Android versionCode (must be greater than the installed build)
         required: true
         type: number
-        default: 11
+        default: 12
       version_name:
         description: Human-readable versionName
         required: true
         type: string
-        default: "1.10"
+        default: "1.11"
 
 permissions:
   contents: read
@@ -134,6 +134,7 @@ jobs:
           python step215-camera-return-auth-warning.py
           python step216-nonblocking-photo-qr-success.py
           python step217-sync-status-panel.py
+          python step218-failed-outbox-diagnostics.py
           git diff --check
 
       - name: Set up JDK 17
@@ -205,8 +206,8 @@ jobs:
 
       - name: Apply release version
         env:
-          VERSION_CODE: ${{ inputs.version_code || '11' }}
-          VERSION_NAME: ${{ inputs.version_name || '1.10' }}
+          VERSION_CODE: ${{ inputs.version_code || '12' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.11' }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -241,6 +242,7 @@ jobs:
           python tools/verify_step215_camera_return_auth_warning.py
           python tools/verify_step216_nonblocking_photo_qr_success.py
           python tools/verify_step217_sync_status_panel.py
+          python tools/verify_step218_failed_outbox_diagnostics.py
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
