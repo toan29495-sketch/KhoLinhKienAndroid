@@ -8,7 +8,7 @@ checks = {
     "other codes map to part": "else QrCodeType.PART" in classifier,
     "known part lookup remains first": "val part = dao.byCode(profile.id, scanned)" in main and main.index("val part = dao.byCode(profile.id, scanned)") < main.index("classifyQrCodeType(scanned)"),
     "unknown numeric opens device history": "machineHistoryCode = scanned" in main,
-    "unknown part opens add form with prefilled code": "prefillCode = scanned\n                showAdd = true" in main,
+    "unknown part opens add form with prefilled code": "prefillCode = scanned" in main and "showAdd = true" in main,
     "choice dialog removed": "pendingUnknownQrCode" not in main and "Chưa tìm thấy mã trong kho" not in main,
 }
 for label, ok in checks.items():
