@@ -9,6 +9,7 @@ on:
       - work/step208-completion-build
     paths:
       - ".github/workflows/stable-release.yml"
+      - ".github/workflows/step212-source-validation.yml"
       - ".github/workflows/step212-full-source-validation.yml"
       - "Step208-source.zip"
       - "step208-fixes.patch"
@@ -37,11 +38,6 @@ jobs:
 
       - name: Reconstruct exact release source through Step212
         run: |
-          
-          
-          
-          
-          
           set -euo pipefail
           test -s Step208-source.zip
           unzip -t Step208-source.zip
@@ -138,107 +134,6 @@ jobs:
           PY
           python step212-session-expiry-backup.py
           git diff --check
-          
-          distribution: temurin
-          java-version: "17"
-          
-          python-version: "3.12"
-          
-          packages: "platform-tools"
-          
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-          yes | sdkmanager --licenses
-          
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          set -euo pipefail
-          for name in SUPABASE_URL SUPABASE_PUBLISHABLE_KEY RELEASE_KEYSTORE_BASE64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
-            test -n "${!name}" || { echo "::error::Missing GitHub Actions secret: $name"; exit 1; }
-          done
-          printf 'SUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
-          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-key.jks
-          test -s release-key.jks
-          keytool -list -keystore release-key.jks -storepass "$RELEASE_KEYSTORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS" >/dev/null
-          python - <<'PY'
-          from pathlib import Path
-          p = Path("app/build.gradle.kts")
-          s = p.read_text()
-          marker = "android {"
-          signing = '''
-              signingConfigs {
-                  create("release") {
-                      storeFile = file("../release-key.jks")
-                      storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
-                      keyAlias = System.getenv("RELEASE_KEY_ALIAS")
-                      keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
-                  }
-              }
-              buildTypes {
-                  getByName("release") {
-                      signingConfig = signingConfigs.getByName("release")
-                      isMinifyEnabled = false
-                  }
-              }
-          '''
-          if 'create("release")' in s:
-              raise SystemExit("Release signing already configured; refusing duplicate insertion")
-          if s.count(marker) != 1:
-              raise SystemExit("Could not locate unique Android DSL block")
-          p.write_text(s.replace(marker, marker + signing, 1))
-          PY
-          grep -q 'signingConfig = signingConfigs.getByName("release")' app/build.gradle.kts
-          
-          VERSION_CODE: ${{ inputs.version_code }}
-          VERSION_NAME: ${{ inputs.version_name }}
-          set -euo pipefail
-          python - <<'PY'
-          import os, re
-          from pathlib import Path
-          p = Path("app/build.gradle.kts")
-          s = p.read_text()
-          code = int(os.environ["VERSION_CODE"])
-          name = os.environ["VERSION_NAME"]
-          if code < 4:
-              raise SystemExit("versionCode must be >= 4 for the Step209 baseline")
-          if not re.fullmatch(r"[0-9]+(?:\.[0-9A-Za-z-]+)*", name):
-              raise SystemExit("Invalid versionName")
-          s, n1 = re.subn(r"versionCode\s*=\s*\d+", f"versionCode = {code}", s, count=1)
-          s, n2 = re.subn(r'versionName\s*=\s*"[^"]+"', f'versionName = "{name}"', s, count=1)
-          if n1 != 1 or n2 != 1:
-              raise SystemExit("Could not safely update versionCode/versionName")
-          p.write_text(s)
-          PY
-          
-          python -m compileall -q tools
-          for f in tools/verify_step{190..208}*.py tools/verify_step114_restore_account_isolation.py tools/verify_step127_photo_retry_idempotency.py tools/verify_step141_restore_remote_contract.py tools/verify_step142_remote_reconciliation.py; do
-            test -f "$f" || continue
-            python "$f"
-          done
-          python tools/verify_step209_admin_password_recovery.py
-          python tools/verify_step212_session_expiry_backup.py
-          
-          
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          
-          set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
-          sha256sum "$APK" > "$APK.sha256"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E "^package:|^application-label:"
-          
-          name: KhoLinhKien-Stable-Release-v${{ inputs.version_name }}
-          path: |
-            app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/apk/release/app-release.apk.sha256
-          if-no-files-found: error
-          retention-days: 30
 
       - name: Run Python syntax and source contract verifiers
         run: |
