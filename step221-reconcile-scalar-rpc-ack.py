@@ -3,6 +3,18 @@
 from pathlib import Path
 p = Path("app/src/main/java/vn/kholinhkien/SyncOutboxSender.kt")
 s = p.read_text(encoding="utf-8")
+# Reuse the exact PostgREST imports already proven by the compiled AuthRepository.
+auth_repo = Path("app/src/main/java/vn/kholinhkien/AuthRepository.kt").read_text(encoding="utf-8")
+postgrest_imports = [
+    line for line in auth_repo.splitlines()
+    if line.startswith("import io.github.jan.supabase.postgrest.")
+]
+missing_imports = [line for line in postgrest_imports if line not in s]
+if missing_imports:
+    package_end = s.find("\\n", s.find("package "))
+    if package_end < 0:
+        raise SystemExit("Step221: package declaration not found; cannot add PostgREST imports")
+    s = s[:package_end + 1] + "\\n".join(missing_imports) + "\\n" + s[package_end + 1:]
 old = '''                    is JsonPrimitive -> {
                         require(responseElement.isString) {
                             "RPC đồng bộ trả về giá trị JSON không phải object; giữ giao dịch để đối soát"
@@ -38,16 +50,16 @@ new = '''                    is JsonPrimitive -> {
                             }.decodeList<JsonObject>()
                             val operationRow = operationRows.singleOrNull()
                                 ?: error("RPC trả phản hồi dạng scalar và không tìm thấy đúng một bản ghi đối soát; giữ giao dịch")
-                            val rowOperationId = operationRow["operation_id"]?.jsonPrimitive?.contentOrNull
-                            val rowOwnerId = operationRow["owner_id"]?.jsonPrimitive?.contentOrNull
-                            val rowEntityType = operationRow["entity_type"]?.jsonPrimitive?.contentOrNull
-                            val rowEntityId = operationRow["entity_id"]?.jsonPrimitive?.contentOrNull
+                            val rowOperationId = (operationRow["operation_id"] as? JsonPrimitive)?.contentOrNull
+                            val rowOwnerId = (operationRow["owner_id"] as? JsonPrimitive)?.contentOrNull
+                            val rowEntityType = (operationRow["entity_type"] as? JsonPrimitive)?.contentOrNull
+                            val rowEntityId = (operationRow["entity_id"] as? JsonPrimitive)?.contentOrNull
                             val processedAt = operationRow["processed_at"]
                             require(rowOperationId == claimed.operationId &&
                                 rowOwnerId == ownerId &&
                                 rowEntityType == operation.operationType &&
                                 rowEntityId == claimed.entityId &&
-                                processedAt != null && processedAt !is JsonNull) {
+                                processedAt != null && processedAt.toString() != "null") {
                                 "Bản ghi đối soát không khớp giao dịch hoặc chưa xử lý; giữ giao dịch"
                             }
                             operationRow["result"] as? JsonObject
