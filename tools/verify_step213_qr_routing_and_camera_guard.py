@@ -10,6 +10,7 @@ checks = {
     "one-shot camera callback": "var delivered by remember { mutableStateOf(false) }" in source and "if (!delivered)" in source and "delivered = true" in source,
     "blank payload ignored": "if (value.isNotEmpty())" in source,
     "no silent unknown-to-device fallback": "machineHistoryCode = scanned\\n" not in source,
+    "Step213 progress record": "## Step213 — Safe QR scan routing and duplicate-callback guard" in (root / "PROGRESS.md").read_text(encoding="utf-8"),
 }
 for label, ok in checks.items(): print(("PASS" if ok else "FAIL") + " - " + label)
 print(f"RESULT: {sum(checks.values())}/{len(checks)} PASS")

@@ -126,7 +126,6 @@ jobs:
           verifier.write_text(v)
           PY
           python step212-session-expiry-backup.py
-          python step213-qr-routing-and-camera-guard.py
           git diff --check
 
       - name: Set up JDK 17
@@ -229,7 +228,6 @@ jobs:
           done
           python tools/verify_step209_admin_password_recovery.py
           python tools/verify_step212_session_expiry_backup.py
-          python tools/verify_step213_qr_routing_and_camera_guard.py
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

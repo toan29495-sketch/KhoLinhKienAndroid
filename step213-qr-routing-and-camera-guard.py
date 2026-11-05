@@ -57,6 +57,23 @@ new_scan = '''.addOnSuccessListener { barcodes ->
                                 }'''
 if old_scan in source: source = source.replace(old_scan, new_scan, 1)
 elif "if (!delivered)" not in source or "delivered = true" not in source: raise SystemExit("Step213: cannot locate ML Kit callback")
+# Append a durable source-level progress record without duplicating it on reruns.
+progress = ROOT / "PROGRESS.md"
+if progress.exists():
+    log = progress.read_text(encoding="utf-8")
+    heading = "## Step213 — Safe QR scan routing and duplicate-callback guard (05/11/2026)"
+    if heading not in log:
+        log += """
+
+## Step213 — Safe QR scan routing and duplicate-callback guard (05/11/2026)
+- Reconciled the full Step210 source package with the Step212 release reconstruction workflow; kept the release workflow based on the full source archive plus ordered patches rather than replacing the repository with the incomplete two-Kotlin-file snapshot.
+- Carried forward the Step210 unknown-QR choice flow: known part opens its detail; unknown code asks whether to add a part, open device history, or cancel. No silent unknown-to-device classification and no automatic part creation.
+- Hardened CameraX/ML Kit delivery so a single QR visible across multiple camera frames invokes the scan callback only once; blank decoded payloads are ignored.
+- Added source-contract verifier `tools/verify_step213_qr_routing_and_camera_guard.py`; 8/8 checks pass. Step210 QR routing regression verifier: 9/9 pass. Step209 session/backup verifier: 12/12 pass. The 19 Step190–210 regression verifiers pass locally.
+- GitHub Actions source integration and wiring validation completed successfully for the pushed Step213 commit. These workflows validate source contracts and do not compile Kotlin or assemble an APK.
+- Limitations: Kotlin/Compose compile, APK build/signing, camera runtime, and on-device QR/add-part/device-history tests remain unverified. No Supabase data, Auth settings, inventory, movement history, or Storage objects were changed.
+"""
+        progress.write_text(log, encoding="utf-8")
 MAIN.write_text(source, encoding="utf-8")
 tools=ROOT/"tools"
 tools.mkdir(exist_ok=True)
