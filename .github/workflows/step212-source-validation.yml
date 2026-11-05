@@ -1,0 +1,48 @@
+name: Step212 source validation
+
+on:
+  push:
+    branches:
+      - work/step212-session-expiry-backup
+  pull_request:
+    branches:
+      - work/step208-completion-build
+    paths:
+      - ".github/workflows/**"
+      - "step212-session-expiry-backup.py"
+      - "step211-profile-forced-change-rls.sql"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: step212-source-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Validate workflow YAML syntax
+        run: |
+          ruby -e 'require "yaml"; ARGV.each { |f| YAML.parse_file(f); puts "YAML PASS: #{f}" }' .github/workflows/stable-release.yml .github/workflows/step212-source-validation.yml
+
+      - name: Validate Step212 patch Python syntax
+        run: |
+          python -m py_compile step212-session-expiry-backup.py
+
+      - name: Validate Step212 wiring
+        run: |
+          grep -Fq 'python step212-session-expiry-backup.py' .github/workflows/stable-release.yml
+          grep -Fq 'python tools/verify_step212_session_expiry_backup.py' .github/workflows/stable-release.yml
+          test -s step212-session-expiry-backup.py
+          echo "Step212 wiring checks passed"
+
+      - name: Confirm this workflow does not build APK
+        run: |
+          ! grep -Eiq 'gradlew|assembleRelease|compileReleaseKotlin' .github/workflows/step212-source-validation.yml
+          echo "No Gradle or APK build command in validation workflow"
