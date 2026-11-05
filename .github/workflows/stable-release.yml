@@ -139,6 +139,14 @@ jobs:
           python step220-decode-rpc-json-response.py
           python step221-reconcile-scalar-rpc-ack.py
           python step222-manual-outbox-retry.py
+          python - <<'PY'
+          from pathlib import Path
+          sync = Path("app/src/main/java/vn/kholinhkien/SyncWork.kt").read_text()
+          main = Path("app/src/main/java/vn/kholinhkien/MainActivity.kt").read_text()
+          assert "fun scheduleManual(context: Context, ownerId: String)" in sync, "Step222 scheduler absent from live Gradle source"
+          assert "Đồng bộ kho" in main and "Đồng bộ ngay" in main, "Step222 UI absent from live Gradle source"
+          print("Step222 live Gradle source verification PASS")
+          PY
           git diff --check
 
       - name: Set up JDK 17
