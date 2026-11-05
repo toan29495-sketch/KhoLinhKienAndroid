@@ -132,28 +132,46 @@ with tempfile.TemporaryDirectory() as td:
     live_sync.write_text(live_sync_text)
 
     live_main_text = live_main.read_text()
-    archive_main_text = main.read_text()
+    live_ui = """        var manualSyncBusy by remember(ownerId) { mutableStateOf(false) }
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Đồng bộ kho", style = MaterialTheme.typography.titleMedium)
+                Text("Chạy lại hàng đợi của đúng tài khoản đang đăng nhập. Giao dịch lỗi sẽ được đối soát bằng operation ID cũ; các giao dịch phía sau chỉ chạy theo đúng thứ tự.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(
+                    onClick = {
+                        if (!manualSyncBusy) scope.launch {
+                            manualSyncBusy = true
+                            try {
+                                require(isCanonicalOwnerId(ownerId)) { "Mã tài khoản không hợp lệ" }
+                                require(SupabaseClientProvider.client.auth.currentUserOrNull()?.id == ownerId) {
+                                    "Phiên đăng nhập đã thay đổi hoặc hết hạn; không thể chạy đồng bộ"
+                                }
+                                SyncWorkScheduler.scheduleManual(context, ownerId)
+                                onMessage("Đã yêu cầu đồng bộ thủ công. Ứng dụng sẽ xử lý hàng đợi theo đúng thứ tự khi có mạng.")
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                onMessage("Không thể bắt đầu đồng bộ: ${error.message ?: "Lỗi không xác định"}")
+                            } finally {
+                                manualSyncBusy = false
+                            }
+                        }
+                    },
+                    enabled = !manualSyncBusy && !restoreLocked,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (manualSyncBusy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Default.Sync, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (manualSyncBusy) "Đang yêu cầu…" else "Đồng bộ ngay")
+                }
+            }
+        }"""
     ui_anchor = '        Text("Công cụ", style = MaterialTheme.typography.titleLarge)'
     if "manualSyncBusy" not in live_main_text:
-        lines = archive_main_text.splitlines()
-        card_start = next((i for i, line in enumerate(lines) if line.startswith("        var manualSyncBusy")), -1)
-        if card_start < 0:
-            raise SystemExit("Cannot locate Step222 card start")
-        depth = 0
-        seen_open = False
-        card_lines = []
-        for line in lines[card_start:]:
-            card_lines.append(line)
-            depth += line.count("{") - line.count("}")
-            seen_open = seen_open or "{" in line
-            if seen_open and depth == 0:
-                break
-        else:
-            raise SystemExit("Cannot find balanced end of Step222 card")
-        card = "\\n".join(card_lines)
         if live_main_text.count(ui_anchor) != 1:
             raise SystemExit("Cannot locate unique live ToolsScreen title")
-        live_main_text = live_main_text.replace(ui_anchor, ui_anchor + "\\n" + card, 1)
+        live_main_text = live_main_text.replace(ui_anchor, ui_anchor + "\\n" + live_ui, 1)
     live_main.write_text(live_main_text)
 
     if "fun scheduleManual(context: Context, ownerId: String)" not in live_sync.read_text():
