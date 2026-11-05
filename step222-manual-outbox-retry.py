@@ -113,8 +113,46 @@ with tempfile.TemporaryDirectory() as td:
     live_main = workspace / "app/src/main/java/vn/kholinhkien/MainActivity.kt"
     if not live_sync.is_file() or not live_main.is_file():
         raise SystemExit("Live Gradle source tree is missing Step222 targets")
-    shutil.copy2(sync, live_sync)
-    shutil.copy2(main, live_main)
+    # Merge Step222 additions into the live source instead of copying whole
+    # files from the older archive. Earlier workflow patches (notably Step212
+    # session expiry and backup scheduling) have already modified these files.
+    live_sync_text = live_sync.read_text()
+    archive_sync_text = sync.read_text()
+    scheduler_start = "    /**\n     * Explicit user-triggered retry."
+    scheduler_end = "    fun schedule(context: Context, ownerId: String, isAdmin: Boolean = false) {"
+    if "fun scheduleManual(context: Context, ownerId: String)" not in live_sync_text:
+        start = archive_sync_text.find(scheduler_start)
+        end = archive_sync_text.find(scheduler_end, start)
+        if start < 0 or end < 0:
+            raise SystemExit("Cannot isolate Step222 scheduler block from archive")
+        block = archive_sync_text[start:end]
+        if live_sync_text.count(scheduler_end) != 1:
+            raise SystemExit("Cannot locate unique live scheduler insertion point")
+        live_sync_text = live_sync_text.replace(scheduler_end, block + scheduler_end, 1)
+    live_sync.write_text(live_sync_text)
+
+    live_main_text = live_main.read_text()
+    archive_main_text = main.read_text()
+    ui_anchor = '        Text("Công cụ", style = MaterialTheme.typography.titleLarge)'
+    ui_start = archive_main_text.find(ui_anchor)
+    ui_end_marker = '        Text("Đồng bộ ngay")'
+    ui_end = archive_main_text.find(ui_end_marker, ui_start)
+    if "Đồng bộ ngay" not in live_main_text:
+        if ui_start < 0 or ui_end < 0:
+            raise SystemExit("Cannot isolate Step222 UI block from archive")
+        # Copy only the newly added card, not the surrounding Compose screen.
+        card_start = archive_main_text.find("        var manualSyncBusy", ui_start)
+        if card_start < 0:
+            raise SystemExit("Cannot locate Step222 card start")
+        card_end = archive_main_text.find("\n        }", ui_end)
+        if card_end < 0:
+            raise SystemExit("Cannot locate Step222 card end")
+        card = archive_main_text[card_start:card_end + len("\n        }")]
+        if live_main_text.count(ui_anchor) != 1:
+            raise SystemExit("Cannot locate unique live ToolsScreen title")
+        live_main_text = live_main_text.replace(ui_anchor, ui_anchor + "\n" + card, 1)
+    live_main.write_text(live_main_text)
+
     if "fun scheduleManual(context: Context, ownerId: String)" not in live_sync.read_text():
         raise SystemExit("Step222 scheduler did not reach live Gradle source")
     if "Đồng bộ ngay" not in live_main.read_text():
