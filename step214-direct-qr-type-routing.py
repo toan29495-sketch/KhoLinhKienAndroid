@@ -26,10 +26,17 @@ if start in source:
     source = source[:a] + source[b:]
 elif "Chưa tìm thấy mã trong kho" in source:
     raise SystemExit("Step214: found unknown-QR dialog but could not locate its full block")
-old = '                pendingUnknownQrCode = scanned\\n'
+old = '''            } else {
+                // Legacy QR payloads are plain codes, so an unknown code alone
+                // cannot distinguish a new part from a device. Ask explicitly.
+                pendingUnknownQrCode = scanned
+            }
+'''
 new = '''            } else if (classifyQrCodeType(scanned) == QrCodeType.DEVICE) {
+                // Device QR codes contain digits only; open device history directly.
                 machineHistoryCode = scanned
             } else {
+                // New part QR codes contain at least one non-digit; open the add form directly.
                 prefillCode = scanned
                 showAdd = true
             }
@@ -37,7 +44,7 @@ new = '''            } else if (classifyQrCodeType(scanned) == QrCodeType.DEVICE
 if old in source:
     source = source.replace(old, new, 1)
 elif "classifyQrCodeType(scanned)" not in source:
-    raise SystemExit("Step214: cannot locate pending unknown-QR assignment")
+    raise SystemExit("Step214: cannot locate unknown QR fallback in scan handler")
 if "pendingUnknownQrCode" in source or "Chưa tìm thấy mã trong kho" in source:
     raise SystemExit("Step214: intermediate unknown-QR dialog remains")
 if "classifyQrCodeType(scanned)" not in source:
