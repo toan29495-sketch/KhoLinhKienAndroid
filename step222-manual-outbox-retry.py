@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory() as td:
                 }
             }
         }'''
-    if "Đồng bộ kho" not in m:
+    if "Đồng bộ ngay" not in m:
         if m.count(anchor) != 1:
             raise SystemExit("Could not find unique ToolsScreen title anchor")
         m = m.replace(anchor, ui, 1)
