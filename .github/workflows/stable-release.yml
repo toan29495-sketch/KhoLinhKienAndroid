@@ -270,6 +270,24 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon --stacktrace :app:compileReleaseKotlin :app:assembleRelease
 
+      - name: Verify Step222 UI and scheduler are packaged in APK
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          apk = Path("app/build/outputs/apk/release/app-release.apk")
+          with ZipFile(apk) as z:
+              dex = [name for name in z.namelist() if name.startswith("classes") and name.endswith(".dex")]
+              if not dex:
+                  raise SystemExit("APK contains no DEX files")
+              payload = b"".join(z.read(name) for name in dex)
+          required = ["Đồng bộ ngay".encode(), "Đồng bộ kho".encode(), "inventory-sync-manual-".encode()]
+          missing = [item.decode() for item in required if item not in payload]
+          if missing:
+              raise SystemExit("Step222 content missing from APK DEX: " + ", ".join(missing))
+          print("Step222 APK DEX verification PASS")
+          PY
+
       - name: Verify APK signature and calculate checksum
         run: |
           set -euo pipefail
