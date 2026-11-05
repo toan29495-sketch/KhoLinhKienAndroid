@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""Step222: owner-scoped manual retry trigger for the inventory outbox."""
+from pathlib import Path
+import zipfile, tempfile, shutil
+
+archive = Path("Step208-source.zip")
+if not archive.is_file():
+    raise SystemExit("Missing Step208-source.zip")
+with tempfile.TemporaryDirectory() as td:
+    root = Path(td)
+    with zipfile.ZipFile(archive) as z:
+        z.extractall(root)
+    project = root / "KhoLinhKienAndroid"
+    sync = project / "app/src/main/java/vn/kholinhkien/SyncWork.kt"
+    main = project / "app/src/main/java/vn/kholinhkien/MainActivity.kt"
+    if not sync.is_file() or not main.is_file():
+        raise SystemExit("Expected source files are missing")
+
+    s = sync.read_text()
+    anchor = '''    fun schedule(context: Context, ownerId: String, isAdmin: Boolean = false) {'''
+    addition = '''    /**
+     * Explicit user-triggered retry. It uses a separate unique work name so a
+     * periodic/automatic request waiting in backoff cannot swallow the tap.
+     * The sender still enforces owner fencing, queue order, idempotency and
+     * the process-wide mutex before touching any outbox row.
+     */
+    fun scheduleManual(context: Context, ownerId: String) {
+        if (!Regex("^[0-9a-fA-F-]{36}$").matches(ownerId)) return
+        val manager = WorkManager.getInstance(context.applicationContext)
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = OneTimeWorkRequestBuilder<SyncOutboxWorker>()
+            .setInputData(androidx.work.workDataOf(SyncOutboxWorker.KEY_OWNER_ID to ownerId))
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+        manager.enqueueUniqueWork("inventory-sync-manual-$ownerId", ExistingWorkPolicy.KEEP, request)
+    }
+
+'''
+    if "fun scheduleManual(context: Context, ownerId: String)" not in s:
+        if s.count(anchor) != 1:
+            raise SystemExit("Could not find unique SyncWorkScheduler.schedule anchor")
+        s = s.replace(anchor, addition + anchor, 1)
+    sync.write_text(s)
+
+    m = main.read_text()
+    anchor = '''        Text("Công cụ", style = MaterialTheme.typography.titleLarge)'''
+    ui = '''        Text("Công cụ", style = MaterialTheme.typography.titleLarge)
+        var manualSyncBusy by remember(ownerId) { mutableStateOf(false) }
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Đồng bộ kho", style = MaterialTheme.typography.titleMedium)
+                Text("Chạy lại hàng đợi của đúng tài khoản đang đăng nhập. Giao dịch lỗi sẽ được đối soát bằng operation ID cũ; các giao dịch phía sau chỉ chạy theo đúng thứ tự.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(
+                    onClick = {
+                        if (!manualSyncBusy) scope.launch {
+                            manualSyncBusy = true
+                            try {
+                                require(isCanonicalOwnerId(ownerId)) { "Mã tài khoản không hợp lệ" }
+                                require(SupabaseClientProvider.client.auth.currentUserOrNull()?.id == ownerId) {
+                                    "Phiên đăng nhập đã thay đổi hoặc hết hạn; không thể chạy đồng bộ"
+                                }
+                                SyncWorkScheduler.scheduleManual(context, ownerId)
+                                onMessage("Đã yêu cầu đồng bộ thủ công. Ứng dụng sẽ xử lý hàng đợi theo đúng thứ tự khi có mạng.")
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                onMessage("Không thể bắt đầu đồng bộ: ${error.message ?: "Lỗi không xác định"}")
+                            } finally {
+                                manualSyncBusy = false
+                            }
+                        }
+                    },
+                    enabled = !manualSyncBusy && !restoreLocked,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (manualSyncBusy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Default.Sync, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (manualSyncBusy) "Đang yêu cầu…" else "Đồng bộ ngay")
+                }
+            }
+        }'''
+    if "Đồng bộ kho" not in m:
+        if m.count(anchor) != 1:
+            raise SystemExit("Could not find unique ToolsScreen title anchor")
+        m = m.replace(anchor, ui, 1)
+    main.write_text(m)
+
+    rebuilt = Path(td) / "Step208-source.updated.zip"
+    with zipfile.ZipFile(rebuilt, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in sorted(project.rglob("*")):
+            if p.is_file():
+                z.write(p, Path("KhoLinhKienAndroid") / p.relative_to(project))
+    with zipfile.ZipFile(rebuilt) as z:
+        bad = z.testzip()
+        if bad:
+            raise SystemExit(f"ZIP integrity failure: {bad}")
+        sync_text = z.read("KhoLinhKienAndroid/app/src/main/java/vn/kholinhkien/SyncWork.kt").decode()
+        main_text = z.read("KhoLinhKienAndroid/app/src/main/java/vn/kholinhkien/MainActivity.kt").decode()
+        if "scheduleManual(context: Context, ownerId: String)" not in sync_text:
+            raise SystemExit("Manual scheduler missing from rebuilt ZIP")
+        if "Đồng bộ ngay" not in main_text or "currentUserOrNull()?.id == ownerId" not in main_text:
+            raise SystemExit("Manual sync UI/account fence missing from rebuilt ZIP")
+    shutil.copy2(rebuilt, archive)
+print("Step222 source patch PASS")
