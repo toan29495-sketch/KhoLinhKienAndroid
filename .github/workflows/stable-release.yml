@@ -10,12 +10,12 @@ on:
         description: Android versionCode (must be greater than the installed build)
         required: true
         type: number
-        default: 9
+        default: 10
       version_name:
         description: Human-readable versionName
         required: true
         type: string
-        default: "1.8"
+        default: "1.9"
 
 permissions:
   contents: read
@@ -132,6 +132,7 @@ jobs:
           python step213-qr-routing-and-camera-guard.py
           python step214-direct-qr-type-routing.py
           python step215-camera-return-auth-warning.py
+          python step216-nonblocking-photo-qr-success.py
           git diff --check
 
       - name: Set up JDK 17
@@ -203,8 +204,8 @@ jobs:
 
       - name: Apply release version
         env:
-          VERSION_CODE: ${{ inputs.version_code || '9' }}
-          VERSION_NAME: ${{ inputs.version_name || '1.8' }}
+          VERSION_CODE: ${{ inputs.version_code || '10' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.9' }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -237,6 +238,7 @@ jobs:
           # Step214 supersedes Step213's intermediate-dialog contract; run the Step214 verifier instead.
           python tools/verify_step214_direct_qr_type_routing.py
           python tools/verify_step215_camera_return_auth_warning.py
+          python tools/verify_step216_nonblocking_photo_qr_success.py
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
