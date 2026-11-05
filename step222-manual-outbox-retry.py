@@ -105,4 +105,18 @@ with tempfile.TemporaryDirectory() as td:
         if "Đồng bộ ngay" not in main_text or "currentUserOrNull()?.id == ownerId" not in main_text:
             raise SystemExit("Manual sync UI/account fence missing from rebuilt ZIP")
     shutil.copy2(rebuilt, archive)
+    # Also patch the live workspace source that the release workflow compiles.
+    # The archive is the canonical baseline, but Gradle builds from the already
+    # extracted workspace; updating only the ZIP would silently omit Step222.
+    workspace = Path.cwd()
+    live_sync = workspace / "app/src/main/java/vn/kholinhkien/SyncWork.kt"
+    live_main = workspace / "app/src/main/java/vn/kholinhkien/MainActivity.kt"
+    if not live_sync.is_file() or not live_main.is_file():
+        raise SystemExit("Live Gradle source tree is missing Step222 targets")
+    shutil.copy2(sync, live_sync)
+    shutil.copy2(main, live_main)
+    if "fun scheduleManual(context: Context, ownerId: String)" not in live_sync.read_text():
+        raise SystemExit("Step222 scheduler did not reach live Gradle source")
+    if "Đồng bộ ngay" not in live_main.read_text():
+        raise SystemExit("Step222 UI did not reach live Gradle source")
 print("Step222 source patch PASS")
