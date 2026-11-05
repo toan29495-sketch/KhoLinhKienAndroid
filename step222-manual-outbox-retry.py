@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory() as td:
                 }
             }
         }'''
-    if "Đồng bộ ngay" not in m:
+    if "manualSyncBusy" not in m:
         if m.count(anchor) != 1:
             raise SystemExit("Could not find unique ToolsScreen title anchor")
         m = m.replace(anchor, ui, 1)
@@ -134,7 +134,7 @@ with tempfile.TemporaryDirectory() as td:
     live_main_text = live_main.read_text()
     archive_main_text = main.read_text()
     ui_anchor = '        Text("Công cụ", style = MaterialTheme.typography.titleLarge)'
-    if "Đồng bộ ngay" not in live_main_text:
+    if "manualSyncBusy" not in live_main_text:
         lines = archive_main_text.splitlines()
         card_start = next((i for i, line in enumerate(lines) if line.startswith("        var manualSyncBusy")), -1)
         if card_start < 0:
@@ -158,6 +158,6 @@ with tempfile.TemporaryDirectory() as td:
 
     if "fun scheduleManual(context: Context, ownerId: String)" not in live_sync.read_text():
         raise SystemExit("Step222 scheduler did not reach live Gradle source")
-    if "Đồng bộ ngay" not in live_main.read_text():
+    if "manualSyncBusy" not in live_main.read_text() or "Đồng bộ ngay" not in live_main.read_text():
         raise SystemExit("Step222 UI did not reach live Gradle source")
 print("Step222 source patch PASS")
