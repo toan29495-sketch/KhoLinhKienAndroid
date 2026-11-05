@@ -10,18 +10,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract sync DAO and worker source
+      - name: Extract DAO and worker definitions
         shell: bash
         run: |
           python3 - <<'PY'
-          import zipfile
+          import zipfile,re
           z=zipfile.ZipFile('Step208-source.zip')
-          wanted=('InventoryDao.kt','SyncWorkScheduler.kt','SyncWorker.kt','InventorySyncWorker.kt','SyncOutboxWorker.kt','MainActivity.kt')
-          for name in z.namelist():
-              if name.split('/')[-1] in wanted:
-                  data=z.read(name).decode('utf-8')
-                  print('FILE_BEGIN:',name)
-                  for i,line in enumerate(data.splitlines(),1):
-                      print(f'{i}: {line}')
-                  print('FILE_END:',name)
+          names=z.namelist()
+          for n in names:
+              if any(t in n.lower() for t in ('dao','worker','scheduler','database')):
+                  print('CANDIDATE:',n)
+          for n in names:
+              if n.endswith('.kt'):
+                  s=z.read(n).decode('utf-8',errors='replace')
+                  if any(t in s for t in ('pendingOutbox','claimOutboxForSend','markOutboxFailed','recoverExpiredClaims','class SyncWorker','object SyncWorkScheduler')):
+                      print('FILE_BEGIN:',n)
+                      lines=s.splitlines()
+                      pats=re.compile(r'pendingOutbox|claimOutboxForSend|markOutboxFailed|recoverExpiredClaims|class SyncWorker|object SyncWorkScheduler|Outbox.*(Pending|Failed|Claim)|status.*(PENDING|FAILED)',re.I)
+                      keep=set()
+                      for i,line in enumerate(lines):
+                          if pats.search(line):
+                              keep.update(range(max(0,i-8),min(len(lines),i+16)))
+                      last=-2
+                      for i in sorted(keep):
+                          if i>last+1: print('...')
+                          print(f'{i+1}: {lines[i]}')
+                          last=i
+                      print('FILE_END:',n)
           PY
