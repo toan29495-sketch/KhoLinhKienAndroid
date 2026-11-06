@@ -10,12 +10,12 @@ on:
         description: Android versionCode (must be greater than the installed build)
         required: true
         type: number
-        default: 16
+        default: 17
       version_name:
         description: Human-readable versionName
         required: true
         type: string
-        default: "1.15"
+        default: "1.16"
 
 permissions:
   contents: read
@@ -139,13 +139,16 @@ jobs:
           python step220-decode-rpc-json-response.py
           python step221-reconcile-scalar-rpc-ack.py
           python step222-manual-outbox-retry.py
+          python step223-append-sync-triggers.py
           python - <<'PY'
           from pathlib import Path
           sync = Path("app/src/main/java/vn/kholinhkien/SyncWork.kt").read_text()
           main = Path("app/src/main/java/vn/kholinhkien/MainActivity.kt").read_text()
           assert "fun scheduleManual(context: Context, ownerId: String)" in sync, "Step222 scheduler absent from live Gradle source"
           assert "Đồng bộ kho" in main and "Đồng bộ ngay" in main, "Step222 UI absent from live Gradle source"
-          print("Step222 live Gradle source verification PASS")
+          assert sync.count("ExistingWorkPolicy.APPEND_OR_REPLACE, request") == 2, "Step223 append scheduling policy missing"
+          assert 'ExistingWorkPolicy.KEEP, periodic' in sync, "Step223 must preserve periodic work policy"
+          print("Step222-Step223 live Gradle source verification PASS")
           PY
           git diff --check
 
@@ -270,7 +273,7 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon --stacktrace :app:compileReleaseKotlin :app:assembleRelease
 
-      - name: Verify Step222 UI and scheduler are packaged in APK
+      - name: Verify Step222-Step223 sync scheduler is packaged in APK
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -281,11 +284,11 @@ jobs:
               if not dex:
                   raise SystemExit("APK contains no DEX files")
               payload = b"".join(z.read(name) for name in dex)
-          required = ["Đồng bộ ngay".encode(), "Đồng bộ kho".encode(), "inventory-sync-manual-".encode()]
+          required = ["Đồng bộ ngay".encode(), "Đồng bộ kho".encode(), "inventory-sync-manual-".encode(), "inventory-sync-once-".encode()]
           missing = [item.decode() for item in required if item not in payload]
           if missing:
               raise SystemExit("Step222 content missing from APK DEX: " + ", ".join(missing))
-          print("Step222 APK DEX verification PASS")
+          print("Step222-Step223 APK DEX verification PASS")
           PY
 
       - name: Verify APK signature and calculate checksum
