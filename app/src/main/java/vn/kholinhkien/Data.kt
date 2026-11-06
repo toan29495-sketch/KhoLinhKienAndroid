@@ -1200,7 +1200,7 @@ interface InventoryDao {
         update(part.copy(quantity = after, updatedAt = System.currentTimeMillis()))
         val movement = Movement(code = code, partName = part.name, type = type, amount = amount,
             beforeQty = part.quantity, afterQty = after, reason = reason, machineOrStore = machine, ownerId = ownerId, ownerName = ownerName)
-        insertMovement(movement)
+        addMovement(movement)
         val payload = JSONObject().apply {
             put("type", type); put("amount", amount); put("reason", reason)
             put("machine_or_store", machine); put("movement_sync_id", movement.syncId)

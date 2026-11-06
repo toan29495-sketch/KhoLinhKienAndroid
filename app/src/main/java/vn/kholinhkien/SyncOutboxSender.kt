@@ -179,7 +179,7 @@ class SyncOutboxSender(
         requireActiveOwner(ownerId)
         client.storage.from("part-images").upload(remotePath, photoBytes) {
             upsert = true
-            contentType = io.ktor.http.ContentType.parse(mimeType)
+            contentType = mimeType
         }
         // Never publish a photo_path to the parts table based only on the upload
         // response. Read the private object back with the active authenticated session.

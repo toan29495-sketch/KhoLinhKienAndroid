@@ -202,7 +202,7 @@ object BackupManager {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
-                put("description", ownerMarker)
+                put(MediaStore.MediaColumns.DESCRIPTION, ownerMarker)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = resolver.insert(collection, values) ?: error("Không tạo được tệp sao lưu trong Downloads")
@@ -282,7 +282,7 @@ object BackupManager {
         ownerMarker: String,
         nowMillis: Long
     ) {
-        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND ${MediaStore.MediaColumns.IS_PENDING}=1 AND ${"description"}=?"
+        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND ${MediaStore.MediaColumns.IS_PENDING}=1 AND ${MediaStore.MediaColumns.DESCRIPTION}=?"
         val staleUris = mutableListOf<android.net.Uri>()
         resolver.query(collection, arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DATE_ADDED), selection,
             arrayOf(relativePath + "/", ownerMarker), null)?.use { cursor ->
