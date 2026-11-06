@@ -25,16 +25,15 @@ jobs:
           root = Path(os.environ["INSPECT_ROOT"])
           files = [p for p in root.rglob("*") if p.is_file() and p.suffix in {".kt", ".java", ".sql"}]
           terms = ("STAGED", "restore-", "part-images", "downloadAuthenticated", "uploadTo", "storage.from", "restore session", "continueRestore", "staging")
+          targets = {
+              "RestorePhotoUploadCoordinator.kt": (68, 180),
+              "RestoreCloudPayloadPreparer.kt": (1, 82),
+          }
           for p in files:
-              try: lines = p.read_text(errors="ignore").splitlines()
-              except Exception: continue
-              hits = [i for i,s in enumerate(lines) if any(t.lower() in s.lower() for t in terms)]
-              if hits:
-                  print("\\n===== FILE:", p.relative_to(root), "=====")
-                  shown=set()
-                  for i in hits:
-                      for n in range(max(0,i-5), min(len(lines),i+8)):
-                          if n not in shown:
-                              print(f"{n+1}: {lines[n]}")
-                              shown.add(n)
+              if p.name not in targets: continue
+              lines = p.read_text(errors="ignore").splitlines()
+              start, end = targets[p.name]
+              print("\\n===== TARGET:", p.name, "=====")
+              for n in range(start-1, min(len(lines), end)):
+                  print(f"{n+1}: {lines[n]}")
           PY
