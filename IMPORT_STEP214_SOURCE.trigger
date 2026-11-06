@@ -5,3 +5,5 @@ Rebuild check 2026-11-06 19:19 +07.
 Compile-fix pass 2 committed; rebuild checked-in source 2026-11-06.
 
 Canonical path compile fix; rebuild 2026-11-06.
+
+Fix owner-scoped update and canonical path normalization; rebuild.
