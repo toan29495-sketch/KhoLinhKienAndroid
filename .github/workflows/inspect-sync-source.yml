@@ -1,0 +1,27 @@
+name: Inspect inventory sync source
+on:
+  push:
+    paths:
+      - ".github/workflows/inspect-sync-source.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract and print sync source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/src"
+          unzip -q Step208-source.zip -d "$RUNNER_TEMP/src"
+          ROOT="$RUNNER_TEMP/src/KhoLinhKienAndroid"
+          echo "=== MATCHED FILES ==="
+          find "$ROOT/app/src/main/java" -type f -name '*.kt' | grep -Ei 'sync|outbox|dao|repository|worker|database' | sort
+          echo "=== SOURCE CONTENTS ==="
+          while IFS= read -r f; do
+            echo "===== FILE: ${f#"$ROOT/"} ====="
+            sed -n '1,260p' "$f"
+          done < <(find "$ROOT/app/src/main/java" -type f -name '*.kt' | grep -Ei 'sync|outbox|dao|repository|worker|database' | sort)
