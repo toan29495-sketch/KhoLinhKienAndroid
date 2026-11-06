@@ -308,13 +308,13 @@ fun InventoryApp() {
     // Flow. A failed/unsupported migration must be shown as a recoverable screen,
     // not escape composition and send the user back to the launcher after login.
     var databaseRetry by remember(profile.id) { mutableIntStateOf(0) }
-    var dao by remember(profile.id) { mutableStateOf<InventoryDao?>(null) }
+    var loadedDao by remember(profile.id) { mutableStateOf<InventoryDao?>(null) }
     var databaseError by remember(profile.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(profile.id, databaseRetry) {
-        dao = null
+        loadedDao = null
         databaseError = null
         try {
-            dao = withContext(Dispatchers.IO) {
+            loadedDao = withContext(Dispatchers.IO) {
                 val database = AppDb.get(context)
                 database.openHelper.writableDatabase // run migrations and Room schema validation here
                 database.dao()
@@ -326,7 +326,7 @@ fun InventoryApp() {
             databaseError = "${error::class.java.simpleName}: ${error.message ?: "Không rõ lỗi cơ sở dữ liệu"}"
         }
     }
-    if (dao == null) {
+    if (loadedDao == null) {
         DatabaseStartupFailureScreen(
             error = databaseError,
             onRetry = { databaseRetry++ },
@@ -334,7 +334,7 @@ fun InventoryApp() {
         )
         return
     }
-    val inventoryDao = dao ?: return
+    val inventoryDao = loadedDao ?: return
     val scope = rememberCoroutineScope()
     val isAdmin = profile.role.equals("admin", ignoreCase = true)
 
