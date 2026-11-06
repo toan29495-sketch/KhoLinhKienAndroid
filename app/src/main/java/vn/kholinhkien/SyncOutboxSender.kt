@@ -3,6 +3,7 @@ package vn.kholinhkien
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.storage
+import io.ktor.http.ContentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -142,7 +143,7 @@ class SyncOutboxSender(
         // photo_path tương đối là đường dẫn object cloud, không phải file Android.
         if (!file.isAbsolute) return PhotoUploadResult(source)
         require(Regex("^[0-9a-fA-F-]{36}$").matches(ownerId)) { "Mã chủ kho không hợp lệ khi tải ảnh" }
-        val canonicalFile = file.canonicalFile
+        val canonicalFile = file.getCanonicalFile()
         val ownerPendingDir = File(File(appFilesDirectory, "pending_part_photos"), ownerId).canonicalFile
         val legacyPendingDir = File(File(appFilesDirectory, "pending_part_photos")).canonicalFile
         val isOwnerScoped = canonicalFile.parentFile == ownerPendingDir
@@ -179,7 +180,7 @@ class SyncOutboxSender(
         requireActiveOwner(ownerId)
         client.storage.from("part-images").upload(remotePath, photoBytes) {
             upsert = true
-            contentType = mimeType
+            contentType = ContentType.parse(mimeType)
         }
         // Never publish a photo_path to the parts table based only on the upload
         // response. Read the private object back with the active authenticated session.
