@@ -1197,7 +1197,7 @@ interface InventoryDao {
             else "Số lượng tồn vượt giới hạn cho phép"
         }
         val after = afterLong.toInt()
-        update(part.copy(quantity = after, updatedAt = System.currentTimeMillis()))
+        update(ownerId, part.copy(quantity = after, updatedAt = System.currentTimeMillis()))
         val movement = Movement(code = code, partName = part.name, type = type, amount = amount,
             beforeQty = part.quantity, afterQty = after, reason = reason, machineOrStore = machine, ownerId = ownerId, ownerName = ownerName)
         insertMovement(movement)
