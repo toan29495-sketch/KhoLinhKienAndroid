@@ -8,7 +8,7 @@ on:
       - .github/workflows/build-step214-v1.17.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -30,6 +30,13 @@ jobs:
           grep -q 'versionCode = 18' app/build.gradle.kts
           grep -q 'versionName = "1.17"' app/build.gradle.kts
           git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: import Step214 v1.17 Android source tree"
+            git push origin HEAD:test/step214-v1.17
+          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
