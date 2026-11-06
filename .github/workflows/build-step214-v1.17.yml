@@ -1,0 +1,55 @@
+name: Build Step214 v1.17 from uploaded archive
+
+on:
+  push:
+    branches: [test/step214-v1.17]
+    paths:
+      - KhoLinhKienAndroid-v1.17.zip
+      - .github/workflows/build-step214-v1.17.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract and validate source
+        run: |
+          set -euo pipefail
+          unzip -t KhoLinhKienAndroid-v1.17.zip
+          mkdir -p "$RUNNER_TEMP/src"
+          unzip -q KhoLinhKienAndroid-v1.17.zip -d "$RUNNER_TEMP/src"
+          test -f "$RUNNER_TEMP/src/KhoLinhKienAndroid/settings.gradle.kts"
+          test -f "$RUNNER_TEMP/src/KhoLinhKienAndroid/app/build.gradle.kts"
+          test -f "$RUNNER_TEMP/src/KhoLinhKienAndroid/STEP214_REVIEW.md"
+          rsync -a "$RUNNER_TEMP/src/KhoLinhKienAndroid/" "$GITHUB_WORKSPACE/" --exclude='.git/'
+          chmod +x ./gradlew
+          grep -q 'versionCode = 18' app/build.gradle.kts
+          grep -q 'versionName = "1.17"' app/build.gradle.kts
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools"
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses
+      - name: Validate Kotlin and build APK
+        run: ./gradlew --no-daemon --stacktrace :app:compileReleaseKotlin :app:assembleRelease
+      - name: Upload APK and imported source
+        uses: actions/upload-artifact@v4
+        with:
+          name: KhoLinhKien-Step214-v1.17-build
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/output-metadata.json
+            STEP214_REVIEW.md
+          if-no-files-found: error
+          retention-days: 30
