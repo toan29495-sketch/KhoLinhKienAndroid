@@ -140,6 +140,7 @@ jobs:
           python step221-reconcile-scalar-rpc-ack.py
           python step222-manual-outbox-retry.py
           python step223-append-sync-triggers.py
+          python step224-restore-photo-not-found.py
           python - <<'PY'
           from pathlib import Path
           sync = Path("app/src/main/java/vn/kholinhkien/SyncWork.kt").read_text()
@@ -148,6 +149,9 @@ jobs:
           assert "Đồng bộ kho" in main and "Đồng bộ ngay" in main, "Step222 UI absent from live Gradle source"
           assert sync.count("ExistingWorkPolicy.APPEND_OR_REPLACE, request") == 2, "Step223 append scheduling policy missing"
           assert "ExistingPeriodicWorkPolicy.KEEP" in sync, "Step223 must preserve periodic work policy"
+          restore_storage = Path("app/src/main/java/vn/kholinhkien/SupabaseRestorePhotoStorage.kt").read_text()
+          assert "error.response.status == HttpStatusCode.NotFound" in restore_storage, "Step224 missing Storage 404 handling"
+          assert "throw error" in restore_storage, "Step224 must propagate non-404 failures"
           print("Step222-Step223 live Gradle source verification PASS")
           PY
           git diff --check
