@@ -60,7 +60,7 @@ internal class RestoreCloudSnapshotApplier(
             false
         }
 
-        ApplyResult(
+        return ApplyResult(
             restoreId = restoreId,
             partCount = journal.partCount,
             movementCount = journal.movementCount,
