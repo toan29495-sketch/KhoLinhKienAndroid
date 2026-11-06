@@ -147,7 +147,7 @@ jobs:
           assert "fun scheduleManual(context: Context, ownerId: String)" in sync, "Step222 scheduler absent from live Gradle source"
           assert "Đồng bộ kho" in main and "Đồng bộ ngay" in main, "Step222 UI absent from live Gradle source"
           assert sync.count("ExistingWorkPolicy.APPEND_OR_REPLACE, request") == 2, "Step223 append scheduling policy missing"
-          assert 'ExistingWorkPolicy.KEEP, periodic' in sync, "Step223 must preserve periodic work policy"
+          assert "ExistingPeriodicWorkPolicy.KEEP" in sync, "Step223 must preserve periodic work policy"
           print("Step222-Step223 live Gradle source verification PASS")
           PY
           git diff --check
