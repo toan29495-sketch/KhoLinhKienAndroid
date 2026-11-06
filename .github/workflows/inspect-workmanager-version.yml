@@ -1,0 +1,24 @@
+name: Inspect WorkManager scheduling contract
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/inspect-workmanager-version.yml"
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract source and inspect WorkManager
+        run: |
+          set -euo pipefail
+          unzip -q Step208-source.zip -d "$RUNNER_TEMP/src"
+          cd "$RUNNER_TEMP/src/KhoLinhKienAndroid"
+          echo "=== WorkManager dependencies ==="
+          grep -RniE 'work-runtime|workManager|androidx.work' app/build.gradle.kts build.gradle.kts gradle/libs.versions.toml 2>/dev/null || true
+          echo "=== SyncWork.kt ==="
+          sed -n '1,260p' app/src/main/java/vn/kholinhkien/SyncWork.kt
+          echo "=== Gradle wrapper version ==="
+          grep -n 'distributionUrl' gradle/wrapper/gradle-wrapper.properties
