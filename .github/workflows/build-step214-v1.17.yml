@@ -41,6 +41,18 @@ jobs:
         run: |
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
           yes | sdkmanager --licenses
+      - name: Preserve extracted source for repair
+        if: always()
+        run: |
+          tar -czf "$RUNNER_TEMP/step214-source.tar.gz" --exclude=.git -C "$GITHUB_WORKSPACE" .
+      - name: Upload extracted source for repair
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KhoLinhKien-Step214-v1.17-source-for-repair
+          path: ${{ runner.temp }}/step214-source.tar.gz
+          if-no-files-found: error
+          retention-days: 7
       - name: Validate Kotlin and build APK
         run: ./gradlew --no-daemon --stacktrace :app:compileReleaseKotlin :app:assembleRelease
       - name: Upload APK and imported source
