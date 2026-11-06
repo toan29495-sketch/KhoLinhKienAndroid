@@ -1,0 +1,27 @@
+name: Inspect outbox implementation details
+on:
+  push:
+    paths:
+      - ".github/workflows/inspect-outbox-details.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print DAO and write transaction contexts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/src"
+          unzip -q Step208-source.zip -d "$RUNNER_TEMP/src"
+          ROOT="$RUNNER_TEMP/src/KhoLinhKienAndroid/app/src/main/java/vn/kholinhkien"
+          for spec in "Data.kt:140:185" "Data.kt:825:910" "Data.kt:960:990" "Data.kt:1190:1225" "MainActivity.kt:235:270" "MainActivity.kt:675:805"; do
+            file="${spec%%:*}"; rest="${spec#*:}"; start="${rest%%:*}"; end="${rest##*:}"
+            echo "===== $file lines $start-$end ====="
+            sed -n "${start},${end}p" "$ROOT/$file"
+          done
+          echo "=== DATABASE ANNOTATIONS ==="
+          grep -nE '@Dao|@Database|@Insert|@Transaction|abstract class|interface InventoryDao|suspend fun enqueue' "$ROOT/Data.kt" | head -100
