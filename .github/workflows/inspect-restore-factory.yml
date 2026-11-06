@@ -1,0 +1,19 @@
+name: Inspect restore photo factory
+on:
+  push:
+    branches:
+      - work/step212-session-expiry-backup
+    paths:
+      - '.github/workflows/inspect-restore-factory.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read factory
+        run: |
+          unzip -q Step208-source.zip -d "$RUNNER_TEMP/src"
+          FILE=$(find "$RUNNER_TEMP/src" -name RestorePhotoUploadFactory.kt -print -quit)
+          cat "$FILE"
