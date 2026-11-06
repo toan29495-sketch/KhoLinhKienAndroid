@@ -29,6 +29,10 @@ internal class RestoreCloudSnapshotReader(
     private companion object {
         const val MIN_FREE_BYTES_DURING_SNAPSHOT = 16L * 1024L * 1024L
         const val SQLITE_WRITE_MULTIPLIER = 2L
+        const val PAYLOAD_PART = "PART_PAYLOAD"
+        const val PAYLOAD_MOVEMENT = "MOVEMENT_PAYLOAD"
+        const val SNAPSHOT_PART = "SNAPSHOT_PART"
+        const val SNAPSHOT_MOVEMENT = "SNAPSHOT_MOVEMENT"
     }
 
     suspend fun download(ownerId: String, restoreId: String): Result {
@@ -68,7 +72,7 @@ internal class RestoreCloudSnapshotReader(
             require(movementRows == journal.movementCount) { "Số lịch sử snapshot không khớp journal" }
             requireActiveOwner(ownerId)
             dao.saveRestoreJournal(journal.copy(status = "SNAPSHOT_DOWNLOADED", lastError = "", updatedAt = System.currentTimeMillis()))
-            Result(partRows, movementRows, localPartChunks, localMovementChunks)
+            return Result(partRows, movementRows, localPartChunks, localMovementChunks)
         } catch (cancelled: CancellationException) {
             // Keep SNAPSHOT_DOWNLOADING. A retry clears only the partial snapshot buckets
             // before downloading again; source payload and live inventory remain intact.
@@ -204,12 +208,5 @@ internal class RestoreCloudSnapshotReader(
         require(available >= required) {
             "Điện thoại không đủ dung lượng để tải snapshot cloud. Dữ liệu kho hiện tại chưa bị thay đổi; hãy giải phóng bộ nhớ rồi tiếp tục khôi phục."
         }
-    }
-
-    private companion object {
-        const val PAYLOAD_PART = "PART_PAYLOAD"
-        const val PAYLOAD_MOVEMENT = "MOVEMENT_PAYLOAD"
-        const val SNAPSHOT_PART = "SNAPSHOT_PART"
-        const val SNAPSHOT_MOVEMENT = "SNAPSHOT_MOVEMENT"
     }
 }
