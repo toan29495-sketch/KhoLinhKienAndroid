@@ -23,6 +23,7 @@ import java.io.File
 
 /** Pulls the owner's append-only change feed. Cursor advances only after a page event is applied. */
 class SyncPullWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    private val client get() = SupabaseClientProvider.client
     override suspend fun doWork(): Result {
         // Serialize the entire pull run with ZIP import/resume/abort. If a restore
         // owns the gate, leave the cursor untouched and let WorkManager retry later.
