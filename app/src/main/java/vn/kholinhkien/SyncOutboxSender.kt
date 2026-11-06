@@ -143,13 +143,13 @@ class SyncOutboxSender(
         // photo_path tương đối là đường dẫn object cloud, không phải file Android.
         if (!file.isAbsolute) return PhotoUploadResult(source)
         require(Regex("^[0-9a-fA-F-]{36}$").matches(ownerId)) { "Mã chủ kho không hợp lệ khi tải ảnh" }
-        val canonicalFile = file.getCanonicalFile()
-        val ownerPendingDir = File(File(appFilesDirectory, "pending_part_photos"), ownerId).getCanonicalFile()
-        val legacyPendingDir = File(File(appFilesDirectory, "pending_part_photos")).getCanonicalFile()
-        val isOwnerScoped = canonicalFile.parentFile == ownerPendingDir
+        val canonicalFile = File(file.canonicalPath)
+        val ownerPendingDir = File(File(appFilesDirectory, "pending_part_photos").canonicalPath, ownerId).canonicalPath
+        val legacyPendingDir = File(File(appFilesDirectory, "pending_part_photos").canonicalPath).canonicalPath
+        val isOwnerScoped = canonicalFile.parentFile?.canonicalPath == ownerPendingDir
         // Legacy files are shared-path artifacts from old releases. They may be
         // retried only when Room proves exclusive ownership across parts and outbox.
-        val isLegacyPending = canonicalFile.parentFile == legacyPendingDir && canonicalFile.name.startsWith("pending_")
+        val isLegacyPending = canonicalFile.parentFile?.canonicalPath == legacyPendingDir && canonicalFile.name.startsWith("pending_")
         require(isOwnerScoped || isLegacyPending) {
             "Ảnh chờ đồng bộ không nằm trong thư mục riêng của chủ kho"
         }
