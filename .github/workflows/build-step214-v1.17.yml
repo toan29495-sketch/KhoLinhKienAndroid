@@ -25,7 +25,7 @@ jobs:
           test -f "$RUNNER_TEMP/src/KhoLinhKienAndroid/settings.gradle.kts"
           test -f "$RUNNER_TEMP/src/KhoLinhKienAndroid/app/build.gradle.kts"
           test -f "$RUNNER_TEMP/src/KhoLinhKienAndroid/STEP214_REVIEW.md"
-          rsync -a "$RUNNER_TEMP/src/KhoLinhKienAndroid/" "$GITHUB_WORKSPACE/" --exclude='.git/'
+          rsync -a "$RUNNER_TEMP/src/KhoLinhKienAndroid/" "$GITHUB_WORKSPACE/" --exclude='.git/' --exclude='.github/'
           chmod +x ./gradlew
           grep -q 'versionCode = 18' app/build.gradle.kts
           grep -q 'versionName = "1.17"' app/build.gradle.kts
