@@ -6,6 +6,7 @@ on:
     paths:
       - KhoLinhKienAndroid-v1.17.zip
       - .github/workflows/build-step214-v1.17.yml
+      - IMPORT_STEP214_SOURCE.trigger
 
 permissions:
   contents: write
