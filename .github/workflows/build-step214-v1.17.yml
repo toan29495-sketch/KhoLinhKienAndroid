@@ -52,6 +52,18 @@ jobs:
           test -s release-key.jks
           keytool -list -keystore release-key.jks -storepass "$RELEASE_KEYSTORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS" >/dev/null
 
+      - name: Create local.properties with Supabase connection settings
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL" || { echo "::error::Missing repository secret: SUPABASE_URL"; exit 1; }
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo "::error::Missing repository secret: SUPABASE_PUBLISHABLE_KEY"; exit 1; }
+          case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo "::error::SUPABASE_URL is not a valid hosted Supabase HTTPS URL"; exit 1 ;; esac
+          printf 'SUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+          grep -q '^SUPABASE_URL=https://' local.properties
+          
       - name: Preserve extracted source for repair
         if: always()
         run: |
