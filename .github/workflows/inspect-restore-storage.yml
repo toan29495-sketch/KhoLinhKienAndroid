@@ -1,0 +1,19 @@
+name: Inspect restore storage adapter
+on:
+  push:
+    branches:
+      - work/step212-session-expiry-backup
+    paths:
+      - '.github/workflows/inspect-restore-storage.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read storage adapter
+        run: |
+          unzip -q Step208-source.zip -d "$RUNNER_TEMP/src"
+          FILE=$(find "$RUNNER_TEMP/src" -name SupabaseRestorePhotoStorage.kt -print -quit)
+          cat "$FILE"
