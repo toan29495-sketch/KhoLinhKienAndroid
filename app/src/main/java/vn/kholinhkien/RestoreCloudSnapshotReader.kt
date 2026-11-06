@@ -29,6 +29,10 @@ internal class RestoreCloudSnapshotReader(
     private companion object {
         const val MIN_FREE_BYTES_DURING_SNAPSHOT = 16L * 1024L * 1024L
         const val SQLITE_WRITE_MULTIPLIER = 2L
+        const val PAYLOAD_PART = "PART_PAYLOAD"
+        const val PAYLOAD_MOVEMENT = "MOVEMENT_PAYLOAD"
+        const val SNAPSHOT_PART = "SNAPSHOT_PART"
+        const val SNAPSHOT_MOVEMENT = "SNAPSHOT_MOVEMENT"
     }
 
     suspend fun download(ownerId: String, restoreId: String): Result {
@@ -61,7 +65,7 @@ internal class RestoreCloudSnapshotReader(
         dao.clearRestoreStagedRowsByType(ownerId, restoreId, SNAPSHOT_PART)
         dao.clearRestoreStagedRowsByType(ownerId, restoreId, SNAPSHOT_MOVEMENT)
 
-        try {
+        return try {
             val partRows = readEntity(ownerId, restoreId, "PART", SNAPSHOT_PART, localPartChunks, journal)
             val movementRows = readEntity(ownerId, restoreId, "MOVEMENT", SNAPSHOT_MOVEMENT, localMovementChunks, journal)
             require(partRows == journal.partCount) { "Số linh kiện snapshot không khớp journal" }
@@ -206,10 +210,4 @@ internal class RestoreCloudSnapshotReader(
         }
     }
 
-    private companion object {
-        const val PAYLOAD_PART = "PART_PAYLOAD"
-        const val PAYLOAD_MOVEMENT = "MOVEMENT_PAYLOAD"
-        const val SNAPSHOT_PART = "SNAPSHOT_PART"
-        const val SNAPSHOT_MOVEMENT = "SNAPSHOT_MOVEMENT"
-    }
 }
