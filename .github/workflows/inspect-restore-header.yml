@@ -1,0 +1,16 @@
+name: Inspect restore coordinator header
+on:
+  push:
+    branches: [work/step212-session-expiry-backup]
+    paths: ['.github/workflows/inspect-restore-header.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          unzip -q Step208-source.zip -d "$RUNNER_TEMP/src"
+          FILE=$(find "$RUNNER_TEMP/src" -name RestorePhotoUploadCoordinator.kt -print -quit)
+          sed -n '1,68p' "$FILE"
