@@ -144,8 +144,8 @@ class SyncOutboxSender(
         if (!file.isAbsolute) return PhotoUploadResult(source)
         require(Regex("^[0-9a-fA-F-]{36}$").matches(ownerId)) { "Mã chủ kho không hợp lệ khi tải ảnh" }
         val canonicalFile = file.getCanonicalFile()
-        val ownerPendingDir = File(File(appFilesDirectory, "pending_part_photos"), ownerId).canonicalFile
-        val legacyPendingDir = File(File(appFilesDirectory, "pending_part_photos")).canonicalFile
+        val ownerPendingDir = File(File(appFilesDirectory, "pending_part_photos"), ownerId).getCanonicalFile()
+        val legacyPendingDir = File(File(appFilesDirectory, "pending_part_photos")).getCanonicalFile()
         val isOwnerScoped = canonicalFile.parentFile == ownerPendingDir
         // Legacy files are shared-path artifacts from old releases. They may be
         // retried only when Room proves exclusive ownership across parts and outbox.
