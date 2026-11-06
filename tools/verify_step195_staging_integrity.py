@@ -1,0 +1,25 @@
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+LIFE = (ROOT / 'app/src/main/java/vn/kholinhkien/RestoreStagingLifecycle.kt').read_text()
+ZIP = (ROOT / 'app/src/main/java/vn/kholinhkien/ZipRestore.kt').read_text()
+PREP = (ROOT / 'app/src/main/java/vn/kholinhkien/RestoreCloudPayloadPreparer.kt').read_text()
+checks=[]
+def check(label, ok): checks.append((label, bool(ok)))
+check('resume validation checks exact row count', 'rows.size != expected' in LIFE)
+check('resume validation requires contiguous zero-based chunk indexes', 'grouped.keys.toList() != (0 until grouped.size).toList()' in LIFE)
+check('resume validation requires contiguous row indexes per chunk', 'chunk.map { it.rowIndex } != chunk.indices.toList()' in LIFE)
+check('resume validation caps each staged chunk at 200 rows', 'chunk.size > 200' in LIFE)
+check('resume validation rejects blank staged payloads', 'it.payloadJson.isBlank()' in LIFE)
+check('photo references are derived from staged PART rows', 'optString("photoEntry", "")' in LIFE)
+check('photo paths reject traversal and backslashes', 'entry.contains' in LIFE and 'it == ".."' in LIFE)
+check('photo files must resolve inside canonical photos directory', 'file.path.startsWith(photosRoot.path + File.separator)' in LIFE)
+check('photo file must exist, be nonempty and supported type', 'file.isFile && file.length() > 0L' in LIFE and '"jpg", "jpeg", "png", "webp"' in LIFE)
+check('inspect exposes photo readiness only after row validation', 'val photosReady = rowsValid && validatePhotoFiles' in LIFE)
+check('STAGED re-import requires complete structural validation', 'canResumeStaged(context, dao, ownerId, restoreId)' in ZIP)
+check('payload preparation validates structural row integrity', 'RestoreStagingLifecycle.validateSourceRows(dao, journal)' in PREP)
+check('source rows are not modified by validation', 'validateChunkedRows' in LIFE and 'delete' not in LIFE[LIFE.index('internal suspend fun validateSourceRows'):LIFE.index('private suspend fun validatePhotoFiles')].lower())
+check('ZIP staging still never clears live inventory', 'deleteAllParts' not in ZIP and 'clearAllMovements' not in ZIP)
+failed=[x for x in checks if not x[1]]
+for label,ok in checks: print(('PASS ' if ok else 'FAIL ')+label)
+print(f'\n{len(checks)-len(failed)}/{len(checks)} checks PASS')
+if failed: raise SystemExit(1)

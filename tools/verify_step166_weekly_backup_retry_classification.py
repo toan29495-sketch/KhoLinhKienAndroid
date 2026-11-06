@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""Step166 retry classification and terminal integrity handling checks."""
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
+WORK=(ROOT/'app/src/main/java/vn/kholinhkien/WeeklyBackupWorker.kt').read_text()
+UP=(ROOT/'app/src/main/java/vn/kholinhkien/SupabaseWeeklyBackupUploader.kt').read_text()
+IDENT=(ROOT/'app/src/main/java/vn/kholinhkien/WeeklyBackupIdentity.kt').read_text()
+FAIL=(ROOT/'app/src/main/java/vn/kholinhkien/WeeklyBackupFailure.kt').read_text()
+checks=[]
+def ck(n,v): checks.append((n,bool(v)))
+ck('terminal integrity failure has dedicated exception', 'class PermanentWeeklyBackupException' in FAIL)
+ck('identity/session mismatch has dedicated non-retry exception', 'class WeeklyBackupIdentityException' in FAIL)
+ck('shared identity guard throws dedicated exception', 'throw WeeklyBackupIdentityException' in IDENT)
+ck('uploader identity guard throws dedicated exception', 'throw WeeklyBackupIdentityException' in UP)
+ck('worker stops without retry on identity change', 'catch (_: WeeklyBackupIdentityException)' in WORK)
+ck('worker records permanent error in owner journal', 'markWeeklyBackupFailed(ownerId, active.backupId' in WORK and 'permanent.message' in WORK)
+ck('worker returns failure for terminal integrity error', 'catch (permanent: PermanentWeeklyBackupException)' in WORK and 'Result.failure()' in WORK)
+ck('worker retries unexpected/transient errors', 'catch (_: Exception)' in WORK and 'Result.retry()' in WORK)
+ck('worker no longer treats every IllegalArgumentException as success', 'catch (_: IllegalArgumentException)' not in WORK)
+ck('journal/archive mismatch is terminal', 'throw PermanentWeeklyBackupException(' in UP and 'Journal không khớp archive/metadata' in UP)
+ck('server path mismatch is terminal', 'Máy chủ trả đường dẫn backup không khớp owner/backupId' in UP)
+ck('cloud byte mismatch is terminal', 'Bản sao lưu trên Cloud không khớp kích thước hoặc SHA-256' in UP)
+ck('local prepared archive validation is terminal', 'catch (invalid: IllegalArgumentException)' in UP and 'PermanentWeeklyBackupException' in UP)
+ck('failed download/network exception is allowed to propagate for retry', 'catch (_: Exception)' not in UP[UP.find('private suspend fun verifyStoredObject'):UP.find('private fun validatePreparedArchive')])
+ck('completed download still checks exact size and SHA-256', 'target.length() != expectedSize' in UP and 'actualDigest.equals(expectedSha256' in UP)
+ck('temporary verification copy is deleted on every exit', 'finally {' in UP and 'verifyFile.delete()' in UP)
+ck('cancellation remains propagated', 'catch (cancelled: CancellationException)' in UP and 'throw cancelled' in UP)
+ck('retry keeps same durable backup identity and staged file', 'WeeklyBackupLifecycle.backupIdForAttempt(' in WORK and 'return active.backupId' in (ROOT / 'app/src/main/java/vn/kholinhkien/WeeklyBackupLifecycle.kt').read_text() and 'createOrContinueUpload(expectedPath, prepared.archive)' in UP)
+ck('no automatic schedule activation', 'WeeklyBackupWorkScheduler.schedule' not in (ROOT/'app/src/main/java/vn/kholinhkien/MainActivity.kt').read_text())
+for n,v in checks: print(f'{"PASS" if v else "FAIL"}: {n}')
+print(f'RESULT: {sum(v for _,v in checks)}/{len(checks)} PASS')
+raise SystemExit(0 if all(v for _,v in checks) else 1)

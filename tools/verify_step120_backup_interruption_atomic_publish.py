@@ -1,0 +1,21 @@
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+BACKUP = (ROOT / 'app/src/main/java/vn/kholinhkien/BackupManager.kt').read_text()
+checks = []
+def check(name, condition): checks.append((name, bool(condition)))
+check('Android 8/9 writes to an owner-scoped partial filename', '".backup_${ownerId}_${UUID.randomUUID()}.partial"' in BACKUP)
+check('Android 8/9 publishes only after ZIP stream closes', 'partial.outputStream().buffered().use { createZip' in BACKUP and 'partial.renameTo(target)' in BACKUP)
+check('Android 8/9 refuses to overwrite a completed backup', 'check(!target.exists())' in BACKUP)
+check('failed Android 8/9 write removes its partial file', 'partial.delete()' in BACKUP)
+check('stale partial cleanup requires current owner prefix', 'val prefix = ".backup_${ownerId}_"' in BACKUP)
+check('stale partial cleanup requires UUID suffix', 'suffixPattern.matches(nameTail)' in BACKUP)
+check('stale partial cleanup rejects symlink/non-direct-child paths', 'canonical != candidate.absoluteFile' in BACKUP and 'canonical.parentFile != canonicalRoot' in BACKUP)
+check('stale partial cleanup enforces 24-hour age', 'age >= STALE_TEMP_AGE_MILLIS' in BACKUP)
+check('MediaStore pending item carries exact owner marker', 'MediaStore.MediaColumns.DESCRIPTION, ownerMarker' in BACKUP)
+check('MediaStore stale cleanup selects only pending rows for exact owner and folder', 'IS_PENDING}=1' in BACKUP and 'DESCRIPTION}=?' in BACKUP and 'ownerMarker' in BACKUP)
+check('MediaStore stale cleanup requires age threshold', 'nowMillis - createdSeconds * 1000L < STALE_TEMP_AGE_MILLIS' in BACKUP)
+check('MediaStore completed item is published only after ZIP creation', 'createZip(context, output, ownerId' in BACKUP and 'put(MediaStore.MediaColumns.IS_PENDING, 0)' in BACKUP)
+check('shared ZIP v2 payload and owner validation remain intact', '.put("version", 2)' in BACKUP and 'require(isCanonicalOwnerId(ownerId))' in BACKUP)
+for name, ok in checks: print(('PASS' if ok else 'FAIL') + ' ' + name)
+print(f'{sum(ok for _, ok in checks)}/{len(checks)} PASS')
+if not all(ok for _, ok in checks): raise SystemExit(1)

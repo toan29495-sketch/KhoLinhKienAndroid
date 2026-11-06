@@ -1,0 +1,26 @@
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+LIFE = (ROOT / 'app/src/main/java/vn/kholinhkien/RestoreStagingLifecycle.kt').read_text()
+COORD = (ROOT / 'app/src/main/java/vn/kholinhkien/RestoreCloudCoordinator.kt').read_text()
+checks=[]
+def check(label, ok): checks.append((label, bool(ok)))
+check('Supabase auth extension is imported for lifecycle owner checks', 'import io.github.jan.supabase.auth.auth' in LIFE)
+check('single active owner predicate compares current Auth UID exactly', 'currentUserOrNull()?.id == ownerId' in LIFE)
+check('inspect checks active owner before Room journal read', LIFE.index('requireActiveOwner(ownerId)', LIFE.index('suspend fun inspect')) < LIFE.index('dao.activeRestore(ownerId)', LIFE.index('suspend fun inspect')))
+check('inspect rechecks owner after Room reads and before returning state', 'requireActiveOwner(ownerId)\n        return ResumeInfo' in LIFE)
+check('canResumeStaged fails closed when owner is not active', 'if (!isActiveOwner(ownerId)) return false' in LIFE)
+check('canResumeStaged rechecks owner after validation', 'return valid && isActiveOwner(ownerId)' in LIFE)
+check('completed cleanup checks owner before reading journal', LIFE.index('requireActiveOwner(ownerId)', LIFE.index('suspend fun cleanupCompleted')) < LIFE.index('dao.restoreJournal(ownerId, restoreId)', LIFE.index('suspend fun cleanupCompleted')))
+check('completed cleanup rechecks owner before deleting staged rows', 'requireActiveOwner(ownerId)\n        dao.clearCompletedRestoreStagedRows' in LIFE)
+check('completed cleanup rechecks owner before deleting staged files', 'dao.clearCompletedRestoreStagedRows(ownerId, restoreId)\n        requireActiveOwner(ownerId)\n        if (directory.exists()' in LIFE)
+check('abort is serialized by restore operation gate', 'RestoreOperationGate.mutex.withLock' in LIFE)
+check('abort checks active owner before journal read', LIFE.index('requireActiveOwner(ownerId)', LIFE.index('suspend fun abort')) < LIFE.index('dao.restoreJournal(ownerId, restoreId)', LIFE.index('suspend fun abort')))
+check('abort rechecks owner immediately before Room transaction', 'requireActiveOwner(ownerId)\n            AppDb.get(context).withTransaction' in LIFE)
+check('abort rechecks owner before filesystem cleanup', 'requireActiveOwner(ownerId)\n            if (directory.exists())' in LIFE)
+check('abort remains limited to pre-commit statuses', 'journal.status in setOf("STAGING", "STAGED", "FAILED")' in LIFE)
+check('coordinator import and resume remain serialized', COORD.count('RestoreOperationGate.mutex.withLock') >= 3)
+check('coordinator has exact owner guard around resumed journal reads', 'requireActiveOwner(ownerId)' in COORD[COORD.index('private suspend fun resumeLocked'):COORD.index('if (journal.status == \"COMPLETE\")')] and 'dao.restoreJournal(ownerId, restoreId)' in COORD[COORD.index('private suspend fun resumeLocked'):])
+failed=[x for x in checks if not x[1]]
+for label,ok in checks: print(('PASS ' if ok else 'FAIL ')+label)
+print(f'\n{len(checks)-len(failed)}/{len(checks)} checks PASS')
+if failed: raise SystemExit(1)

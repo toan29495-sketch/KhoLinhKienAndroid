@@ -1,0 +1,7 @@
+Recovery manifest
+Baseline archive: KhoLinhKienAndroid-step26-restore-movement-validation-2026-11-02.zip
+Reapplied patch: Step47 operation-scoped photo object path
+Step48: audit/design only
+Step49-Step72: documentation only in available workspace; source changes not recovered
+Step73: source recovery checkpoint
+No APK/build, no SQL deployment, no GitHub push
