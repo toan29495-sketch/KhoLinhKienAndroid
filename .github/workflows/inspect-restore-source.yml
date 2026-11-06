@@ -19,9 +19,10 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/src"
           unzip -q Step208-source.zip -d "$RUNNER_TEMP/src"
-          python - <<'PY'
+          INSPECT_ROOT="$RUNNER_TEMP/src" python - <<'PY'
+          import os
           from pathlib import Path
-          root = Path("$RUNNER_TEMP/src")
+          root = Path(os.environ["INSPECT_ROOT"])
           files = [p for p in root.rglob("*") if p.is_file() and p.suffix in {".kt", ".java", ".sql"}]
           terms = ("STAGED", "restore-", "part-images", "downloadAuthenticated", "uploadTo", "storage.from", "restore session", "continueRestore", "staging")
           for p in files:
