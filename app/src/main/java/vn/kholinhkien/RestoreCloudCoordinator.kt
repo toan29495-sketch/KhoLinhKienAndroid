@@ -78,6 +78,7 @@ internal class RestoreCloudCoordinator(
             // COMPLETE still belongs to the original owner; do not run even local
             // cleanup through a stale screen after logout/account switch.
             requireActiveOwner(ownerId)
+            queuePostRestoreBackupIfNeeded(ownerId, journal)
             val cleaned = try {
                 RestoreStagingLifecycle.cleanupCompleted(context, dao, ownerId, restoreId)
             } catch (cancelled: CancellationException) {
@@ -144,6 +145,7 @@ internal class RestoreCloudCoordinator(
         require(journal.status == "COMPLETE") {
             "Phiên khôi phục đang ở trạng thái ${journal.status}; có thể tiếp tục lại sau khi xử lý nguyên nhân."
         }
+        queuePostRestoreBackupIfNeeded(ownerId, journal)
         val cleanupComplete = try {
             RestoreStagingLifecycle.cleanupCompleted(context, dao, ownerId, restoreId)
         } catch (cancelled: CancellationException) {
@@ -152,6 +154,16 @@ internal class RestoreCloudCoordinator(
             false
         }
         return completedResult(journal, cleanupComplete)
+    }
+
+    private suspend fun queuePostRestoreBackupIfNeeded(ownerId: String, journal: RestoreJournal) {
+        if (journal.sourceType != "LOCAL_ZIP") return
+        requireActiveOwner(ownerId)
+        if (dao.markPostRestoreBackupQueued(ownerId, journal.restoreId) == 1) {
+            // The durable per-restore flag prevents repeated resume/cleanup taps
+            // from creating duplicate cloud backups.
+            WeeklyBackupWorkScheduler.enqueueNow(context, ownerId)
+        }
     }
 
     private fun requireActiveOwner(ownerId: String) {
