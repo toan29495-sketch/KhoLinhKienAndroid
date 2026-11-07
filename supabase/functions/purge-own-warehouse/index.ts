@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { success: false, error: "Method not allowed" });
 
-  const match = (req.headers.get("Authorization") ?? "").match(/^Bearer\\s+(.+)$/i);
+  const match = (req.headers.get("Authorization") ?? "").match(/^Bearer\s+(.+)$/i);
   if (!match) return json(401, { success: false, error: "Thiếu phiên đăng nhập" });
 
   const url = Deno.env.get("SUPABASE_URL");
