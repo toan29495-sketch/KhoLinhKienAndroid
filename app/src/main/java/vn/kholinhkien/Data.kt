@@ -157,10 +157,30 @@ data class RestoreStagedRow(
     val payloadJson: String
 )
 
+data class SyncOutboxStatusCounts(
+    val pendingCount: Int = 0,
+    val inFlightCount: Int = 0,
+    val failedCount: Int = 0,
+    val blockedCount: Int = 0,
+    val lastSyncedAt: Long? = null
+)
+
 @Dao
 interface InventoryDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun enqueue(operation: SyncOutbox)
+
+    // Live, owner-scoped sync status. RESOLVED rows are intentionally excluded.
+    @Query("""
+        SELECT
+            SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pendingCount,
+            SUM(CASE WHEN status = 'IN_FLIGHT' THEN 1 ELSE 0 END) AS inFlightCount,
+            SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failedCount,
+            SUM(CASE WHEN status = 'BLOCKED' THEN 1 ELSE 0 END) AS blockedCount,
+            MAX(CASE WHEN status = 'SYNCED' THEN createdAt ELSE NULL END) AS lastSyncedAt
+        FROM sync_outbox WHERE ownerId = :ownerId
+    """)
+    fun observeSyncOutboxStatus(ownerId: String): Flow<SyncOutboxStatusCounts>
 
     // FAILED được lấy lại để retry; rowid giữ đúng thứ tự enqueue khi createdAt trùng mili-giây.
     // IN_FLIGHT được phục hồi riêng khi worker khởi động lại sau khi app bị dừng đột ngột.
