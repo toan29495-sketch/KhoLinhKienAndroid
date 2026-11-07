@@ -3,9 +3,7 @@ package vn.kholinhkien
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
@@ -90,7 +88,7 @@ internal class RestoreCloudCommitter(
         require(client.auth.currentUserOrNull()?.id == ownerId) {
             "Tài khoản đã thay đổi sau yêu cầu commit; không áp dụng kết quả vào phiên khác"
         }
-        val result = Json.parseToJsonElement(raw.toString()).jsonObject
+        val result = RestoreRpcJson.objectValue(raw, "commit_inventory_restore")
         val status = result["status"]?.jsonPrimitive?.contentOrNull
         val returnedRestoreId = result["restore_id"]?.jsonPrimitive?.contentOrNull
         val digest = result["manifest_sha256"]?.jsonPrimitive?.contentOrNull
