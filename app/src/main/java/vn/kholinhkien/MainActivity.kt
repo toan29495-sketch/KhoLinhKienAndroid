@@ -520,7 +520,6 @@ fun InventoryApp() {
     var machineHistoryCode by remember(profile.id) { mutableStateOf<String?>(null) }
     // Raw QR codes are shared by legacy part labels and device labels. An unknown
     // code must not be silently classified as a device or silently create a part.
-    var pendingUnknownQrCode by remember(profile.id) { mutableStateOf<String?>(null) }
     var machineHistoryMovements by remember(profile.id) { mutableStateOf<List<Movement>>(emptyList()) }
     LaunchedEffect(machineHistoryCode, profile.id, isAdmin) {
         val code = machineHistoryCode
@@ -824,7 +823,10 @@ fun InventoryApp() {
             dismissButton = { TextButton(onClick = { restoreUri = null; restorePreview = null; restorePreviewError = "" }) { Text("Hủy") } }
         )
     }
-    if (showAdd) AddPartDialog(initialCode = prefillCode, photoPath = pendingPhotoPath, onChoosePhoto = { photoPicker.launch("image/*") }, onTakePhoto = takePhoto, onDismiss = { showAdd = false; pendingPhotoPath = ""; prefillCode = "" }, onSave = { part ->
+    if (showAdd) AddPartDialog(initialCode = prefillCode, photoPath = pendingPhotoPath, onChoosePhoto = { photoPicker.launch("image/*") }, onTakePhoto = takePhoto, onMachineHistory = { code ->
+        showAdd = false
+        machineHistoryCode = code
+    }, onDismiss = { showAdd = false; pendingPhotoPath = ""; prefillCode = "" }, onSave = { part ->
         scope.launch {
             try {
                 requireNoActiveRestore()
@@ -891,37 +893,14 @@ fun InventoryApp() {
             if (part != null) {
                 selected = part
             } else {
-                // Legacy QR payloads are plain codes, so an unknown code alone
-                // cannot distinguish a new part from a device. Ask explicitly.
-                pendingUnknownQrCode = scanned
+                // Unknown scanned component codes open the add form immediately.
+                // Device history remains available from the add form.
+                prefillCode = scanned
+                pendingPhotoPath = ""
+                showAdd = true
             }
         }
     })
-    pendingUnknownQrCode?.let { scannedCode ->
-        AlertDialog(
-            onDismissRequest = { pendingUnknownQrCode = null },
-            title = { Text("Chưa tìm thấy mã trong kho") },
-            text = {
-                Text("Mã QR: $scannedCode\n\nBạn muốn thêm mã này thành linh kiện hay tra cứu lịch sử của thiết bị? Nếu linh kiện đã có trên máy chủ nhưng chưa tải về thiết bị, hãy đồng bộ kho trước khi tạo mới.")
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingUnknownQrCode = null
-                    prefillCode = scannedCode
-                    showAdd = true
-                }) { Text("Thêm linh kiện") }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = {
-                        pendingUnknownQrCode = null
-                        machineHistoryCode = scannedCode
-                    }) { Text("Lịch sử thiết bị") }
-                    TextButton(onClick = { pendingUnknownQrCode = null }) { Text("Hủy") }
-                }
-            }
-        )
-    }
     machineHistoryCode?.let { machineCode ->
         MachineHistoryDialog(
             machineCode = machineCode,
@@ -1179,7 +1158,7 @@ fun SummaryCard(title: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun AddPartDialog(initialCode: String, photoPath: String, onChoosePhoto: () -> Unit, onTakePhoto: () -> Unit, onDismiss: () -> Unit, onSave: (Part) -> Unit) {
+fun AddPartDialog(initialCode: String, photoPath: String, onChoosePhoto: () -> Unit, onTakePhoto: () -> Unit, onMachineHistory: (String) -> Unit, onDismiss: () -> Unit, onSave: (Part) -> Unit) {
     var code by remember(initialCode) { mutableStateOf(initialCode) }; var name by remember { mutableStateOf("") }
     var qty by remember { mutableStateOf("1") }; var min by remember { mutableStateOf("0") }
     var unit by remember { mutableStateOf("cái") }; var note by remember { mutableStateOf("") }
@@ -1187,6 +1166,9 @@ fun AddPartDialog(initialCode: String, photoPath: String, onChoosePhoto: () -> U
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Thêm linh kiện") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedTextField(code, { code = it.trim() }, label = { Text("Mã QR / mã linh kiện *") }, singleLine = true)
+            TextButton(onClick = { if (code.isNotBlank()) onMachineHistory(code.trim()) }) {
+                Text("Đây là mã thiết bị? Xem lịch sử")
+            }
             OutlinedTextField(name, { name = it }, label = { Text("Tên linh kiện *") }, singleLine = true)
             Text("Cách quản lý mã QR", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
