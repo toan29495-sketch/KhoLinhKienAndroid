@@ -423,6 +423,7 @@ fun InventoryApp() {
     }
     val parts by dao.partsForOwner(profile.id).collectAsState(initial = emptyList())
     val blockedOperations by dao.syncAttentionOutbox(profile.id).collectAsState(initial = emptyList())
+    val syncStatus by dao.observeSyncOutboxStatus(profile.id).collectAsState(initial = SyncOutboxStatusCounts())
     var selectedBlockedOperation by remember(profile.id) { mutableStateOf<SyncOutbox?>(null) }
     var conflictServerSnapshot by remember(profile.id) { mutableStateOf("") }
     var readingConflictSnapshot by remember(profile.id) { mutableStateOf(false) }
@@ -625,6 +626,7 @@ fun InventoryApp() {
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 14.dp)) {
+            SyncStatusLine(syncStatus)
             when(tab) {
                 0 -> {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1399,6 +1401,54 @@ private fun restoreStatusDescription(status: String): String = when (status) {
     "COMMIT_UNKNOWN" -> "Ứng dụng sẽ kiểm tra lại cùng mã phiên; không tạo phiên mới để tránh gửi/commit trùng."
     "COMMIT_CONFIRMED", "SNAPSHOT_DOWNLOADING", "SNAPSHOT_DOWNLOADED", "REMOTE_COMMIT_CONFIRMED" -> "Kho hiện tại chỉ được thay sau khi snapshot cloud được xác minh và Room transaction hoàn tất."
     else -> "Tiếp tục sẽ chạy lại giai đoạn phù hợp với trạng thái đã lưu."
+}
+
+@Composable
+private fun SyncStatusLine(status: SyncOutboxStatusCounts) {
+    val pending = status.pendingCount
+    val running = status.inFlightCount
+    val failed = status.failedCount
+    val blocked = status.blockedCount
+    val unresolved = pending + running + failed + blocked
+    val lastSync = status.lastSyncedAt?.let {
+        SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(it))
+    }
+    val hasAttention = failed > 0 || blocked > 0
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (hasAttention) MaterialTheme.colorScheme.errorContainer
+            else MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(
+                    if (hasAttention) Icons.Default.SyncProblem else if (running > 0) Icons.Default.Sync else Icons.Default.CloudSync,
+                    contentDescription = null,
+                    tint = if (hasAttention) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    when {
+                        blocked > 0 -> "Đồng bộ cần xử lý: $unresolved thao tác chưa hoàn tất"
+                        failed > 0 -> "Đồng bộ gặp lỗi: $unresolved thao tác chưa hoàn tất"
+                        running > 0 -> "Đang đồng bộ · còn $unresolved thao tác"
+                        pending > 0 -> "Đang chờ đồng bộ · $pending thao tác"
+                        else -> "Đã đồng bộ hết thao tác trên thiết bị"
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (hasAttention) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Text(
+                "Chờ: $pending  ·  Đang gửi: $running  ·  Lỗi: $failed  ·  Cần đối soát: $blocked" +
+                    (lastSync?.let { "  ·  Gửi thành công gần nhất: $it" } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (hasAttention) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
+    }
 }
 
 @Composable
