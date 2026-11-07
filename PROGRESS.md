@@ -1804,3 +1804,5 @@
 - Added Room migration 14→15 and a durable per-restore enqueue flag. After a successful local ZIP restore, the app enqueues one fresh Cloud backup; repeat resume/cleanup taps do not enqueue another for the same restore.
 - GitHub Actions build for the latest source is still running; earlier run 82 failed only because the new Compose file was missing the Supabase auth extension import. That import was added in a later commit; do not treat the earlier failed run as the latest result.
 - Not yet verified: final APK build/artifact, installation on HONOR device, live password-gated wipe using a disposable test account, Storage deletion across both buckets, and local ZIP restore followed by VERIFIED Cloud upload. Do not test the destructive action on a production warehouse until a disposable account/warehouse is selected.
+
+- Release compatibility: bumped versionCode/versionName from 30/1.29 to 31/1.30 so the new APK can update over an already-installed 1.29 build without uninstalling. The version-31 signed build is now the required final artifact; earlier 1.29 artifacts are not the release to install.
