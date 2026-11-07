@@ -17,6 +17,12 @@ import kotlinx.serialization.json.decodeFromJsonElement
 
 
 @Serializable
+data class WarehouseWipeResponse(
+    val success: Boolean = false,
+    val error: String = ""
+)
+
+@Serializable
 data class AdminAuditEvent(
     val id: String,
     @SerialName("actor_username") val actorUsername: String,
@@ -60,6 +66,35 @@ class AuthRepository {
         client.auth.signInWith(Email) {
             email = usernameToEmail(username)
             this.password = password
+        }
+    }
+
+    /** Re-authenticate the exact current account before an irreversible owner-only wipe. */
+    suspend fun reauthenticateForWarehouseWipe(username: String, password: String, expectedOwnerId: String) {
+        require(password.isNotBlank()) { "Vui lòng nhập mật khẩu đăng nhập" }
+        require(client.auth.currentUserOrNull()?.id == expectedOwnerId) {
+            "Phiên đăng nhập đã thay đổi; không thể xóa kho"
+        }
+        client.auth.signInWith(Email) {
+            email = usernameToEmail(username)
+            this.password = password
+        }
+        require(client.auth.currentUserOrNull()?.id == expectedOwnerId) {
+            "Mật khẩu không xác thực đúng tài khoản đang đăng nhập"
+        }
+    }
+
+    suspend fun purgeCloudWarehouseAfterReauthentication(ownerId: String) {
+        require(client.auth.currentUserOrNull()?.id == ownerId) {
+            "Phiên đăng nhập không còn thuộc chủ kho"
+        }
+        val response = client.functions.invoke("purge-own-warehouse")
+        val result = response.body<WarehouseWipeResponse>()
+        check(result.success) {
+            result.error.ifBlank { "Máy chủ chưa xác nhận xóa toàn bộ dữ liệu kho" }
+        }
+        require(client.auth.currentUserOrNull()?.id == ownerId) {
+            "Tài khoản đã thay đổi trong khi xóa kho"
         }
     }
 
