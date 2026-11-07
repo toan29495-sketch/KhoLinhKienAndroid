@@ -45,11 +45,27 @@ internal object RestoreRpcJson {
     }
 
     private fun unwrapJsonString(value: JsonElement, operation: String): JsonElement {
-        if (value !is JsonPrimitive) return value
-        val trimmed = value.content.trim()
-        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return value
-        return runCatching { parser.parseToJsonElement(trimmed) }
-            .getOrElse { throw IllegalStateException("RPC $operation chứa JSON object/array dạng primitive nhưng nội dung không hợp lệ", it) }
+        // Some serializer/transport combinations can preserve a JSONB object as
+        // a JSON string that itself contains another JSON string. Unwrap bounded
+        // layers until the requested shape is reached; never coerce scalar values.
+        var current = value
+        repeat(4) {
+            if (current !is JsonPrimitive || current.isString.not() && current.content.trim().let {
+                    !(it.startsWith("{") || it.startsWith("[") || it.startsWith("\\\""))
+                }) return current
+
+            val text = current.content.trim()
+            val looksLikeJsonContainer = text.startsWith("{") || text.startsWith("[")
+            val looksLikeQuotedJson = text.startsWith("\\\"")
+            if (!looksLikeJsonContainer && !looksLikeQuotedJson) return current
+
+            val next = runCatching { parser.parseToJsonElement(text) }
+                .getOrElse { throw IllegalStateException("RPC $operation chứa JSON primitive bọc nhiều lớp nhưng không hợp lệ", it) }
+            if (next == current) return current
+            current = next
+            if (current is JsonObject || current is JsonArray) return current
+        }
+        return current
     }
 
     private fun kindOf(value: JsonElement): String = when (value) {
