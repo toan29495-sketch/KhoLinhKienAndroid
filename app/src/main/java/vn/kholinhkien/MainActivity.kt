@@ -763,7 +763,12 @@ fun InventoryApp() {
                     },
                     onMessage = { message = it }
                 )
-                3 -> if (isAdmin) AdminScreen(onMessage = { message = it }, onSignOut = signOut)
+                3 -> if (isAdmin) AdminScreen(
+                    ownerId = profile.id,
+                    username = profile.username,
+                    onMessage = { message = it },
+                    onSignOut = signOut
+                )
             }
         }
     }
@@ -1482,6 +1487,7 @@ fun ToolsScreen(
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Công cụ", style = MaterialTheme.typography.titleLarge)
+        WarehouseWipeSection(ownerId = ownerId, username = username, onMessage = onMessage)
         if (syncStatus.pendingCount + syncStatus.failedCount > 0 && syncStatus.blockedCount == 0) {
             Button(
                 onClick = onContinueSync,
