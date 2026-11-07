@@ -120,7 +120,11 @@ internal class RestoreCloudCoordinator(
                 // coordinator was waiting. Always make the durable journal authoritative.
                 journal = requireNotNull(dao.restoreJournal(ownerId, restoreId))
                 require(journal.ownerId == ownerId) { "Phiên khôi phục không thuộc tài khoản hiện tại" }
-                if (journal.status in setOf("COMMIT_CONFIRMED", "SNAPSHOT_DOWNLOADING")) {
+                if (journal.status in setOf("COMMIT_CONFIRMED", "SNAPSHOT_DOWNLOADING", "SNAPSHOT_DOWNLOADED")) {
+                    // Always re-read a previously downloaded snapshot before applying it.
+                    // Older builds could checkpoint SNAPSHOT_DOWNLOADED with staged PART
+                    // rows missing server_version. Re-download verifies the immutable
+                    // cloud checksum and runs current compatibility normalization.
                     RestoreCloudSnapshotReader(context.applicationContext, dao).download(ownerId, restoreId)
                     journal = requireNotNull(dao.restoreJournal(ownerId, restoreId))
                 }
