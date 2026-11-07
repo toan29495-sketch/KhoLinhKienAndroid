@@ -132,7 +132,28 @@ internal fun WarehouseWipeSection(
                                         require(SupabaseClientProvider.client.auth.currentUserOrNull()?.id == ownerId) {
                                             "Phiên đăng nhập thay đổi; không xóa dữ liệu cục bộ"
                                         }
-                                        AppDb.get(context).dao().clearEntireOwnerWarehouse(ownerId)
+                                        val dao = AppDb.get(context).dao()
+                                        // Delete private image files only when Room proves that no other
+                                        // owner references the exact same legacy absolute path.
+                                        val ownedPhotoPaths = dao.backupPartsForOwner(ownerId)
+                                            .map { it.photoPath.trim() }
+                                            .filter { it.isNotBlank() && java.io.File(it).isAbsolute }
+                                            .distinct()
+                                        for (photoPath in ownedPhotoPaths) {
+                                            val photo = java.io.File(photoPath).canonicalFile
+                                            if (photo.isFile && dao.isLocalPhotoReferencedOnlyByOwner(ownerId, photo.path)) {
+                                                check(photo.delete()) { "Không xóa được ảnh cục bộ của kho: ${photo.name}" }
+                                            }
+                                        }
+                                        val pendingRoot = java.io.File(context.filesDir, "pending_part_photos").canonicalFile
+                                        val ownerPending = java.io.File(pendingRoot, ownerId).canonicalFile
+                                        if (ownerPending.exists()) {
+                                            require(ownerPending.parentFile == pendingRoot && ownerPending.name == ownerId) {
+                                                "Đường dẫn ảnh chờ xóa không an toàn"
+                                            }
+                                            check(ownerPending.deleteRecursively()) { "Không dọn được ảnh chờ đồng bộ của tài khoản" }
+                                        }
+                                        dao.clearEntireOwnerWarehouse(ownerId)
                                     }
                                 }
                                 onMessage("Đã xóa kho Cloud và dữ liệu kho trên điện thoại của @$username. Tài khoản và các tệp ZIP đã lưu trên máy được giữ nguyên. Hãy nhập lại ZIP để kiểm tra khôi phục; sau khi khôi phục thành công ứng dụng sẽ tạo backup Cloud mới.")
