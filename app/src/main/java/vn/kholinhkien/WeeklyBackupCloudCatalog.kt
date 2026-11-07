@@ -3,12 +3,9 @@ package vn.kholinhkien
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.util.UUID
@@ -51,7 +48,11 @@ internal class WeeklyBackupCloudCatalog(
         val raw = client.postgrest.rpc("list_my_inventory_backups")
         // Parse the complete response atomically. A malformed row must not result
         // in a partial catalog that could hide a newer or conflicting backup.
-        val rows = Json.parseToJsonElement(raw.toString()).jsonArray.map { parseEntry(it.jsonObject, ownerId) }
+        val rows = RestoreRpcJson.arrayValue(raw, "list_my_inventory_backups").mapIndexed { index, row ->
+            val item = row as? JsonObject
+                ?: error("RPC list_my_inventory_backups: dòng $index không phải JSON object")
+            parseEntry(item, ownerId)
+        }
         require(client.auth.currentUserOrNull()?.id == ownerId) {
             "Tài khoản đã thay đổi trong lúc tải danh sách backup"
         }
