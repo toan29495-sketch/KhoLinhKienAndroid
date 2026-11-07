@@ -123,6 +123,7 @@ internal fun WarehouseWipeSection(
                                 }
                                 repository.reauthenticateForWarehouseWipe(username, password, ownerId)
                                 // Prevent local restore/backup workers from racing the destructive operation.
+                                var localPhotoCleanupComplete = true
                                 RestoreOperationGate.mutex.withLock {
                                     WeeklyBackupExecutionLock.withOwner(ownerId) {
                                         SyncWorkScheduler.cancelOwner(context, ownerId)
@@ -133,7 +134,6 @@ internal fun WarehouseWipeSection(
                                             "Phiên đăng nhập thay đổi; không xóa dữ liệu cục bộ"
                                         }
                                         val dao = AppDb.get(context).dao()
-                                        var localPhotoCleanupComplete = true
                                         // Delete private image files only when Room proves that no other
                                         // owner references the exact same legacy absolute path.
                                         val ownedPhotoPaths = dao.backupPartsForOwner(ownerId)
