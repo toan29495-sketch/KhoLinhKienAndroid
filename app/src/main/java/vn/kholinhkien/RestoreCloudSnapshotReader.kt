@@ -143,13 +143,30 @@ internal class RestoreCloudSnapshotReader(
 
             val rows = payload.mapIndexed { rowIndex, element ->
                 require(element is kotlinx.serialization.json.JsonObject) { "Dòng snapshot không phải JSON object" }
+                // commit_inventory_restore inserts every restored PART with server_version = 1.
+                // Older staged payloads predate that field, so reconstruct the committed
+                // version locally only AFTER the immutable payload checksum was verified.
+                val normalizedElement = if (entityType == "PART") {
+                    val suppliedVersion = element["server_version"]?.jsonPrimitive?.longOrNull
+                    if (suppliedVersion == null) {
+                        buildJsonObject {
+                            element.forEach { (key, value) -> put(key, value) }
+                            put("server_version", 1L)
+                        }
+                    } else {
+                        require(suppliedVersion > 0L) { "Snapshot linh kiện có server_version không hợp lệ" }
+                        element
+                    }
+                } else {
+                    element
+                }
                 RestoreStagedRow(
                     restoreId = restoreId,
                     ownerId = ownerId,
                     entityType = storageType,
                     chunkIndex = index,
                     rowIndex = rowIndex,
-                    payloadJson = element.toString()
+                    payloadJson = normalizedElement.toString()
                 )
             }
             // SQLite may need journal/WAL pages beyond the serialized payload size.
