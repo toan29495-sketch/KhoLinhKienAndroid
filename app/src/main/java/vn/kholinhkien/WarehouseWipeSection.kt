@@ -133,6 +133,7 @@ internal fun WarehouseWipeSection(
                                             "Phiên đăng nhập thay đổi; không xóa dữ liệu cục bộ"
                                         }
                                         val dao = AppDb.get(context).dao()
+                                        var localPhotoCleanupComplete = true
                                         // Delete private image files only when Room proves that no other
                                         // owner references the exact same legacy absolute path.
                                         val ownedPhotoPaths = dao.backupPartsForOwner(ownerId)
@@ -142,7 +143,9 @@ internal fun WarehouseWipeSection(
                                         for (photoPath in ownedPhotoPaths) {
                                             val photo = java.io.File(photoPath).canonicalFile
                                             if (photo.isFile && dao.isLocalPhotoReferencedOnlyByOwner(ownerId, photo.path)) {
-                                                check(photo.delete()) { "Không xóa được ảnh cục bộ của kho: ${photo.name}" }
+                                                if (!runCatching { photo.delete() }.getOrDefault(false)) {
+                                                    localPhotoCleanupComplete = false
+                                                }
                                             }
                                         }
                                         val pendingRoot = java.io.File(context.filesDir, "pending_part_photos").canonicalFile
@@ -151,12 +154,18 @@ internal fun WarehouseWipeSection(
                                             require(ownerPending.parentFile == pendingRoot && ownerPending.name == ownerId) {
                                                 "Đường dẫn ảnh chờ xóa không an toàn"
                                             }
-                                            check(ownerPending.deleteRecursively()) { "Không dọn được ảnh chờ đồng bộ của tài khoản" }
+                                            if (!runCatching { ownerPending.deleteRecursively() }.getOrDefault(false)) {
+                                                localPhotoCleanupComplete = false
+                                            }
                                         }
+                                        // Always clear Room after the server confirms the wipe. A leftover
+                                        // orphan image must never leave live rows available to sync again.
                                         dao.clearEntireOwnerWarehouse(ownerId)
+                                        localPhotoCleanupComplete
                                     }
                                 }
-                                onMessage("Đã xóa kho Cloud và dữ liệu kho trên điện thoại của @$username. Tài khoản và các tệp ZIP đã lưu trên máy được giữ nguyên. Hãy nhập lại ZIP để kiểm tra khôi phục; sau khi khôi phục thành công ứng dụng sẽ tạo backup Cloud mới.")
+                                val detail = if (localPhotoCleanupComplete) "" else " Một số tệp ảnh cục bộ mồ côi chưa xóa được; chúng không còn được kho tham chiếu."
+                                onMessage("Đã xóa kho Cloud và dữ liệu kho trên điện thoại của @$username.$detail Tài khoản và các tệp ZIP đã lưu trên máy được giữ nguyên. Hãy nhập lại ZIP để kiểm tra khôi phục; sau khi khôi phục thành công ứng dụng sẽ tạo backup Cloud mới.")
                                 showPassword = false
                                 password = ""
                             } catch (cancelled: CancellationException) {
