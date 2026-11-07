@@ -1806,3 +1806,7 @@
 - Not yet verified: final APK build/artifact, installation on HONOR device, live password-gated wipe using a disposable test account, Storage deletion across both buckets, and local ZIP restore followed by VERIFIED Cloud upload. Do not test the destructive action on a production warehouse until a disposable account/warehouse is selected.
 
 - Release compatibility: bumped versionCode/versionName from 30/1.29 to 31/1.30 so the new APK can update over an already-installed 1.29 build without uninstalling. The version-31 signed build is now the required final artifact; earlier 1.29 artifacts are not the release to install.
+
+## Build retry — 2026-11-07
+- Re-trigger release workflow after correcting `localPhotoCleanupComplete` scope in `WarehouseWipeSection.kt`.
+- Verify GitHub Actions result and `KhoLinhKien-release-apk` artifact before distributing APK 1.30.
