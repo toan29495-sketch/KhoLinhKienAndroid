@@ -713,6 +713,8 @@ fun InventoryApp() {
                 }
                 2 -> ToolsScreen(
                     parts, ownMovements, profile.id, profile.username,
+                    syncStatus = syncStatus,
+                    onContinueSync = { SyncWorkScheduler.schedule(context, profile.id, isAdmin) },
                     restoreJournals = restoreJournals,
                     restoreBusy = restoreBusy,
                     restoreLocked = restoreLocked,
@@ -1450,6 +1452,7 @@ private fun SyncStatusLine(status: SyncOutboxStatusCounts) {
 @Composable
 fun ToolsScreen(
     parts: List<Part>, movements: List<Movement>, ownerId: String, username: String,
+    syncStatus: SyncOutboxStatusCounts, onContinueSync: () -> Unit,
     restoreJournals: List<RestoreJournal>, restoreBusy: Boolean, restoreLocked: Boolean,
     onBatch: () -> Unit, onRestore: () -> Unit,
     onResumeRestore: (String) -> Unit, onRestoreInbox: (File) -> Unit, onMessage: (String) -> Unit
@@ -1479,6 +1482,17 @@ fun ToolsScreen(
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Công cụ", style = MaterialTheme.typography.titleLarge)
+        if (syncStatus.pendingCount + syncStatus.failedCount > 0 && syncStatus.blockedCount == 0) {
+            Button(
+                onClick = onContinueSync,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !restoreLocked
+            ) {
+                Icon(Icons.Default.Sync, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Tiếp tục đồng bộ (" + (syncStatus.pendingCount + syncStatus.failedCount) + ")")
+            }
+        }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Bản sao lưu Cloud", style = MaterialTheme.typography.titleMedium)
