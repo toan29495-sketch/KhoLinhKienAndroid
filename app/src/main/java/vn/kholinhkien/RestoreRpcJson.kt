@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * Calling `.jsonObject` directly on the latter throws:
  * `JsonLiteral is not a JsonObject`.
  *
- * Only one explicit JSON-string unwrap is allowed. Scalar/non-JSON responses
+ * Unwrap JSON text carried by either a quoted JsonPrimitive or a raw JsonLiteral. Some SDK decoding paths preserve the response body as a primitive without setting isString. Scalar/non-JSON responses
  * are rejected with a useful error instead of being mistaken for an object.
  */
 internal object RestoreRpcJson {
@@ -45,11 +45,11 @@ internal object RestoreRpcJson {
     }
 
     private fun unwrapJsonString(value: JsonElement, operation: String): JsonElement {
-        if (value !is JsonPrimitive || !value.isString) return value
+        if (value !is JsonPrimitive) return value
         val trimmed = value.content.trim()
         if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return value
         return runCatching { parser.parseToJsonElement(trimmed) }
-            .getOrElse { throw IllegalStateException("RPC $operation bọc JSON trong chuỗi nhưng nội dung không hợp lệ", it) }
+            .getOrElse { throw IllegalStateException("RPC $operation chứa JSON object/array dạng primitive nhưng nội dung không hợp lệ", it) }
     }
 
     private fun kindOf(value: JsonElement): String = when (value) {
