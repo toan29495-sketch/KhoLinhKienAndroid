@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun AdminScreen(
+    ownerId: String,
+    username: String,
     onMessage: (String) -> Unit,
     onSignOut: () -> Unit
 ) {
@@ -104,6 +106,7 @@ fun AdminScreen(
             ) { Text("+ Tạo tài khoản KTV") }
             OutlinedButton(onClick = onSignOut, enabled = !actionBusy) { Text("Đăng xuất") }
         }
+        WarehouseWipeSection(ownerId = ownerId, username = username, onMessage = onMessage)
         if (showAudit) {
             Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
