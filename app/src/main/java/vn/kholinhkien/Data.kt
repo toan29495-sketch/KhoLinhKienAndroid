@@ -137,7 +137,8 @@ data class RestoreJournal(
     val updatedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(defaultValue = "'LOCAL_ZIP'") val sourceType: String = "LOCAL_ZIP",
     @ColumnInfo(defaultValue = "-1") val partChunkCount: Int = -1,
-    @ColumnInfo(defaultValue = "-1") val movementChunkCount: Int = -1
+    @ColumnInfo(defaultValue = "-1") val movementChunkCount: Int = -1,
+    @ColumnInfo(defaultValue = "0") val postRestoreBackupQueued: Boolean = false
 )
 
 /** Durable, owner-scoped rows staged from a ZIP before cloud commit. These rows
@@ -407,6 +408,9 @@ interface InventoryDao {
     /** Every restore journal read is scoped to the authenticated local owner. */
     @Query("SELECT * FROM restore_journal WHERE ownerId = :ownerId AND restoreId = :restoreId LIMIT 1")
     suspend fun restoreJournal(ownerId: String, restoreId: String): RestoreJournal?
+
+    @Query("UPDATE restore_journal SET postRestoreBackupQueued = 1, updatedAt = :now WHERE ownerId = :ownerId AND restoreId = :restoreId AND status = 'COMPLETE' AND sourceType = 'LOCAL_ZIP' AND postRestoreBackupQueued = 0")
+    suspend fun markPostRestoreBackupQueued(ownerId: String, restoreId: String, now: Long = System.currentTimeMillis()): Int
 
     @Query("DELETE FROM restore_journal WHERE ownerId = :ownerId AND restoreId = :restoreId AND status IN ('STAGING', 'STAGED', 'FAILED')")
     suspend fun deleteAbortableRestoreJournal(ownerId: String, restoreId: String): Int
@@ -1266,7 +1270,7 @@ interface InventoryDao {
     }
 }
 
-@Database(entities = [Part::class, Movement::class, SyncOutbox::class, SyncCursor::class, PartTombstone::class, SyncConflictDecision::class, RestoreJournal::class, RestoreStagedRow::class, WeeklyBackupJournal::class], version = 14, exportSchema = false)
+@Database(entities = [Part::class, Movement::class, SyncOutbox::class, SyncCursor::class, PartTombstone::class, SyncConflictDecision::class, RestoreJournal::class, RestoreStagedRow::class, WeeklyBackupJournal::class], version = 15, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): InventoryDao
 
@@ -1366,11 +1370,17 @@ abstract class AppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE restore_journal ADD COLUMN postRestoreBackupQueued INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var INSTANCE: AppDb? = null
 
         fun get(context: Context): AppDb = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDb::class.java, "kho-linh-kien.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                 .build().also { INSTANCE = it }
         }
     }
