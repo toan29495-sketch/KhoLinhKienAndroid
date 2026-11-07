@@ -1410,9 +1410,6 @@ private fun SyncStatusLine(status: SyncOutboxStatusCounts) {
     val failed = status.failedCount
     val blocked = status.blockedCount
     val unresolved = pending + running + failed + blocked
-    val lastSync = status.lastSyncedAt?.let {
-        SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(it))
-    }
     val hasAttention = failed > 0 || blocked > 0
     Card(
         modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 6.dp),
@@ -1442,8 +1439,7 @@ private fun SyncStatusLine(status: SyncOutboxStatusCounts) {
                 )
             }
             Text(
-                "Chờ: $pending  ·  Đang gửi: $running  ·  Lỗi: $failed  ·  Cần đối soát: $blocked" +
-                    (lastSync?.let { "  ·  Gửi thành công gần nhất: $it" } ?: ""),
+                "Chờ: $pending  ·  Đang gửi: $running  ·  Lỗi: $failed  ·  Cần đối soát: $blocked",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (hasAttention) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
             )
