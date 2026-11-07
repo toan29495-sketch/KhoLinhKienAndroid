@@ -99,7 +99,7 @@ internal class RestoreCloudSnapshotReader(
                 }
             )
             requireActiveOwner(ownerId)
-            val envelope = RestoreRpcJson.objectValue(raw, "read_inventory_restore_snapshot_chunk")
+            val envelope = RestoreRpcJson.objectValue(raw.data, "read_inventory_restore_snapshot_chunk")
             require(envelope["restore_id"]?.jsonPrimitive?.contentOrNull == restoreId) { "Snapshot trả sai restoreId" }
             require(envelope["manifest_sha256"]?.jsonPrimitive?.contentOrNull.equals(journal.manifestSha256, true)) { "Snapshot manifest không khớp" }
             require(envelope["snapshot_cursor"]?.jsonPrimitive?.longOrNull == journal.snapshotCursor) { "Snapshot cursor thay đổi giữa các chunk" }
@@ -128,7 +128,7 @@ internal class RestoreCloudSnapshotReader(
                 }
             )
             requireActiveOwner(ownerId)
-            val verification = RestoreRpcJson.objectValue(verificationRaw, "verify_inventory_restore_snapshot_chunk")
+            val verification = RestoreRpcJson.objectValue(verificationRaw.data, "verify_inventory_restore_snapshot_chunk")
             require(verification["verified"]?.jsonPrimitive?.contentOrNull == "true") {
                 "Checksum snapshot không khớp dữ liệu máy chủ ở chunk $index"
             }
