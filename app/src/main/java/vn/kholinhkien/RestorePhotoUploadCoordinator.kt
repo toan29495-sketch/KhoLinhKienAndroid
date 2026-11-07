@@ -72,25 +72,22 @@ internal class RestorePhotoUploadCoordinator(
                 saved.optString("remotePath") == remotePath &&
                 saved.optString("sha256") == digest && saved.optLong("sizeBytes", -1L) == size
 
-            // Also handles a crash after successful upload but before checkpoint save.
-            val alreadyPresent = checkpointMatches && verifyObject(remotePath, digest, size)
-            requireActiveOwner(ownerId)
-            val presentAfterCrash = !checkpointMatches && verifyObject(remotePath, digest, size)
-            requireActiveOwner(ownerId)
-            if (!alreadyPresent && !presentAfterCrash) {
-                // SDK 3.0.1 upload API consumes ByteArray; memory is bounded to one <=20 MiB photo.
-                val bytes = source.readBytes()
-                check(bytes.size.toLong() == size && sha256(bytes).equals(digest, ignoreCase = true)) {
-                    "Ảnh staging thay đổi trong lúc chuẩn bị upload: $entry"
-                }
-                requireActiveOwner(ownerId)
-                uploadObject(remotePath, bytes, contentType)
-                requireActiveOwner(ownerId)
-                check(verifyObject(remotePath, digest, size)) {
-                    "Ảnh chưa xác minh được trên Storage; giữ nguyên ảnh tạm: $entry"
-                }
-                requireActiveOwner(ownerId)
+            // Do not probe Storage with GET before upload. A missing object returns
+            // a Storage-specific 404 exception (not consistently a Ktor ResponseException
+            // across SDK versions), which previously aborted restore while still STAGED.
+            // Upload uses deterministic owner/restore/hash paths and upsert=true, so it is
+            // safe and idempotent to upload again after a process interruption.
+            val bytes = source.readBytes()
+            check(bytes.size.toLong() == size && sha256(bytes).equals(digest, ignoreCase = true)) {
+                "Ảnh staging thay đổi trong lúc chuẩn bị upload: $entry"
             }
+            requireActiveOwner(ownerId)
+            uploadObject(remotePath, bytes, contentType)
+            requireActiveOwner(ownerId)
+            check(verifyObject(remotePath, digest, size)) {
+                "Ảnh upload xong nhưng chưa xác minh được trên Storage; giữ nguyên ảnh tạm: $entry"
+            }
+            requireActiveOwner(ownerId)
 
             requireActiveOwner(ownerId)
             checkpointData.put(entry, JSONObject()
