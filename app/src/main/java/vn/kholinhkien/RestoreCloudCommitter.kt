@@ -88,7 +88,7 @@ internal class RestoreCloudCommitter(
         require(client.auth.currentUserOrNull()?.id == ownerId) {
             "Tài khoản đã thay đổi sau yêu cầu commit; không áp dụng kết quả vào phiên khác"
         }
-        val result = RestoreRpcJson.objectValue(raw, "commit_inventory_restore")
+        val result = RestoreRpcJson.objectValue(raw.data, "commit_inventory_restore")
         val status = result["status"]?.jsonPrimitive?.contentOrNull
         val returnedRestoreId = result["restore_id"]?.jsonPrimitive?.contentOrNull
         val digest = result["manifest_sha256"]?.jsonPrimitive?.contentOrNull
