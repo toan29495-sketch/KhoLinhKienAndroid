@@ -173,11 +173,10 @@ interface InventoryDao {
     // Live, owner-scoped sync status. RESOLVED rows are intentionally excluded.
     @Query("""
         SELECT
-            SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pendingCount,
-            SUM(CASE WHEN status = 'IN_FLIGHT' THEN 1 ELSE 0 END) AS inFlightCount,
-            SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failedCount,
-            SUM(CASE WHEN status = 'BLOCKED' THEN 1 ELSE 0 END) AS blockedCount,
-            MAX(CASE WHEN status = 'SYNCED' THEN createdAt ELSE NULL END) AS lastSyncedAt
+            COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pendingCount,
+            COALESCE(SUM(CASE WHEN status = 'IN_FLIGHT' THEN 1 ELSE 0 END), 0) AS inFlightCount,
+            COALESCE(SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END), 0) AS failedCount,
+            COALESCE(SUM(CASE WHEN status = 'BLOCKED' THEN 1 ELSE 0 END), 0) AS blockedCount
         FROM sync_outbox WHERE ownerId = :ownerId
     """)
     fun observeSyncOutboxStatus(ownerId: String): Flow<SyncOutboxStatusCounts>
