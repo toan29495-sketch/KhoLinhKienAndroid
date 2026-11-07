@@ -24,8 +24,8 @@ jobs:
           test -f app/build.gradle.kts
           test -f STEP214_REVIEW.md
           chmod +x ./gradlew
-          grep -q 'versionCode = 19' app/build.gradle.kts
-          grep -q 'versionName = "1.18"' app/build.gradle.kts
+          grep -q 'versionCode = 20' app/build.gradle.kts
+          grep -q 'versionName = "1.19"' app/build.gradle.kts
           git diff --check
       - uses: actions/setup-java@v4
         with:
