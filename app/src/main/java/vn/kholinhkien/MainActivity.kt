@@ -542,7 +542,8 @@ fun InventoryApp() {
                 val file = File(dir, "pending_${java.util.UUID.randomUUID()}.jpg")
                 FileOutputStream(file).use { out -> check(bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)) }
                 pendingPhotoPath = file.absolutePath
-                message = "Đã chụp ảnh, đang chờ đồng bộ cloud"
+                // Success is shown inline by the selected photo preview; no modal popup.
+                message = ""
             } catch (e: Exception) { message = "Không lưu được ảnh chờ đồng bộ: ${e.message}" }
         }
     }
@@ -835,7 +836,8 @@ fun InventoryApp() {
                     profile.displayName.ifBlank { profile.username }
                 )
                 SyncWorkScheduler.schedule(context, profile.id, isAdmin)
-                message = "Đã thêm ${part.code}; sẽ đồng bộ khi có mạng"
+                // Save success is reflected by the updated inventory list; no modal popup.
+                message = ""
             } catch (_: Exception) { message = "Mã đã tồn tại hoặc dữ liệu không hợp lệ" }
             showAdd = false
             pendingPhotoPath = ""
