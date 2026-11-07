@@ -129,7 +129,15 @@ fun InventoryApp() {
     val restoreSession: suspend () -> Unit = {
         checkingSession = true
         sessionRestoreError = ""
-        if (!authRepository.isLoggedIn()) {
+        val storedSessionFound = try {
+            authRepository.restoreSessionFromStorage()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            StartupFailureDiagnostics.record(context, "auth-session-restore", error)
+            false
+        }
+        if (!storedSessionFound || !authRepository.isLoggedIn()) {
             currentProfile = null
         } else {
             // Capture the session owner before profile validation: an inactive
@@ -255,48 +263,70 @@ fun InventoryApp() {
     var profileRefreshInFlight by remember(profile.id) { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner, profile.id) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START && !profileRefreshInFlight) {
-                profileRefreshInFlight = true
-                authScope.launch {
-                    try {
-                        if (SessionExpiryPolicy.isExpired(context, profile.id)) {
-                            currentProfile = null
-                            sessionRestoreError = "Phiên đăng nhập đã đủ 30 ngày. Vui lòng đăng nhập lại. Dữ liệu kho trên máy không bị xóa."
-                            SyncWorkScheduler.cancelOwner(context, profile.id)
-                            RestoreRecoveryScheduler.cancelOwner(context, profile.id)
-                            WeeklyBackupWorkScheduler.cancel(context, profile.id)
-                            authRepository.signOut()
-                            check(!authRepository.isLoggedIn()) { "Không thể kết thúc phiên đã quá 30 ngày" }
-                            SessionExpiryPolicy.clear(context, profile.id)
-                            if (currentProfile?.id == profile.id) currentProfile = null
-                            message = "Phiên đăng nhập đã đủ 30 ngày. Vui lòng đăng nhập lại. Dữ liệu kho trên máy không bị xóa."
-                            return@launch
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    if (!profileRefreshInFlight) {
+                        profileRefreshInFlight = true
+                        authScope.launch {
+                            try {
+                                // The SDK lifecycle callback is disabled in
+                                // SupabaseClientProvider. Reload the persisted
+                                // session first, avoiding a race with getCurrentProfile
+                                // after camera/picker return or Android process resume.
+                                val sessionFound = authRepository.restoreSessionFromStorage()
+                                if (!sessionFound || !authRepository.isLoggedIn()) {
+                                    // Offline-first: retain the already verified local
+                                    // profile and Room data; do not show a false
+                                    // "Bạn chưa đăng nhập" popup for a missing in-memory token.
+                                    StartupFailureDiagnostics.record(
+                                        context,
+                                        "auth-session-resume",
+                                        IllegalStateException("Không tìm thấy session trong storage khi resume")
+                                    )
+                                    return@launch
+                                }
+                                if (SessionExpiryPolicy.isExpired(context, profile.id)) {
+                                    currentProfile = null
+                                    sessionRestoreError = "Phiên đăng nhập đã đủ 30 ngày. Vui lòng đăng nhập lại. Dữ liệu kho trên máy không bị xóa."
+                                    SyncWorkScheduler.cancelOwner(context, profile.id)
+                                    RestoreRecoveryScheduler.cancelOwner(context, profile.id)
+                                    WeeklyBackupWorkScheduler.cancel(context, profile.id)
+                                    authRepository.signOut()
+                                    check(!authRepository.isLoggedIn()) { "Không thể kết thúc phiên đã quá 30 ngày" }
+                                    SessionExpiryPolicy.clear(context, profile.id)
+                                    message = "Phiên đăng nhập đã đủ 30 ngày. Vui lòng đăng nhập lại. Dữ liệu kho trên máy không bị xóa."
+                                    return@launch
+                                }
+                                val refreshed = withContext(Dispatchers.IO) {
+                                    authRepository.getCurrentProfile()
+                                }
+                                if (refreshed.id == profile.id && currentProfile?.id == profile.id) {
+                                    currentProfile = refreshed
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (inactive: InactiveProfileException) {
+                                if (currentProfile?.id == profile.id) currentProfile = null
+                                message = inactive.message ?: "Tài khoản đã bị khóa"
+                            } catch (error: Exception) {
+                                // Keep local/offline work available. Do not turn a
+                                // transient auth/network failure into a modal popup.
+                                StartupFailureDiagnostics.record(context, "auth-profile-resume", error)
+                            } finally {
+                                profileRefreshInFlight = false
+                            }
                         }
-                        val refreshed = withContext(Dispatchers.IO) {
-                            authRepository.getCurrentProfile()
-                        }
-                        if (refreshed.id == profile.id && currentProfile?.id == profile.id) {
-                            currentProfile = refreshed
-                        }
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (inactive: InactiveProfileException) {
-                        // The repository has already signed out this inactive account.
-                        if (currentProfile?.id == profile.id) currentProfile = null
-                        message = inactive.message ?: "Tài khoản đã bị khóa"
-                    } catch (error: Exception) {
-                        // Do not sign out or discard local data for a temporary outage.
-                        if (currentProfile?.id == profile.id) {
-                            message = "Chưa thể làm mới quyền tài khoản (vẫn giữ dữ liệu ngoại tuyến): ${error.message ?: "lỗi kết nối"}"
-                        }
-                    } finally {
-                        profileRefreshInFlight = false
                     }
                 }
+                Lifecycle.Event.ON_STOP -> authRepository.stopSessionAutoRefresh()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            authRepository.stopSessionAutoRefresh()
+        }
     }
 
     if (profile.mustChangePassword) {
