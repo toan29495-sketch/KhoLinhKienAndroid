@@ -1154,7 +1154,12 @@ fun TopAppBarCompat(
     onSignOut: () -> Unit,
     showInventoryActions: Boolean = true
 ) {
-    TopAppBar(title = { Text(title) }, actions = {
+    TopAppBar(title = {
+        Column(verticalArrangement = Arrangement.Center) {
+            Text("PIMS", style = MaterialTheme.typography.titleMedium)
+            Text("v${BuildConfig.VERSION_NAME} · $title", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }, actions = {
         if (showInventoryActions) {
             IconButton(onClick = onScan) { Icon(Icons.Default.QrCodeScanner, "Quét QR") }
             IconButton(onClick = onAdd) { Icon(Icons.Default.Add, "Thêm") }
