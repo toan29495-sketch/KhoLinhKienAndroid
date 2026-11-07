@@ -2,7 +2,9 @@ package vn.kholinhkien
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.storage.storage
+import io.ktor.client.plugins.ResponseException
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import java.security.MessageDigest
 
 /**
@@ -34,7 +36,15 @@ internal class SupabaseRestorePhotoStorage(
         }
         // A successful upload response alone is not enough: read the private object
         // back with the current user's authenticated session and compare its bytes.
-        val downloaded = client.storage.from(BUCKET).downloadAuthenticated(remotePath)
+        val downloaded = try {
+            client.storage.from(BUCKET).downloadAuthenticated(remotePath)
+        } catch (error: ResponseException) {
+            // A missing object is expected while checking whether an upload was
+            // completed before a process interruption. Treat only HTTP 404 as
+            // "not present"; propagate auth, network, and server failures.
+            if (error.response.status == HttpStatusCode.NotFound) return false
+            throw error
+        }
         return downloaded.size.toLong() == expectedBytes &&
             sha256(downloaded).equals(expectedSha256, ignoreCase = true)
     }
