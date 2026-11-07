@@ -983,6 +983,42 @@ interface InventoryDao {
     @Query("DELETE FROM parts WHERE ownerId = :ownerId")
     suspend fun clearParts(ownerId: String)
 
+    @Query("SELECT COUNT(*) FROM parts WHERE ownerId = :ownerId")
+    suspend fun countOwnerParts(ownerId: String): Int
+
+    @Query("SELECT COUNT(*) FROM movements WHERE ownerId = :ownerId")
+    suspend fun countOwnerMovements(ownerId: String): Int
+
+    @Query("DELETE FROM part_tombstones WHERE ownerId = :ownerId")
+    suspend fun clearOwnerTombstones(ownerId: String)
+
+    @Query("DELETE FROM sync_conflict_decisions WHERE ownerId = :ownerId")
+    suspend fun clearOwnerConflictDecisions(ownerId: String)
+
+    @Query("DELETE FROM restore_staged_rows WHERE ownerId = :ownerId")
+    suspend fun clearOwnerRestoreStaging(ownerId: String)
+
+    @Query("DELETE FROM restore_journal WHERE ownerId = :ownerId")
+    suspend fun clearOwnerRestoreJournals(ownerId: String)
+
+    @Query("DELETE FROM weekly_backup_journal WHERE ownerId = :ownerId")
+    suspend fun clearOwnerWeeklyBackupJournals(ownerId: String)
+
+    /** Local half of the explicit warehouse wipe; ZIPs in Downloads are outside app-private storage and untouched. */
+    @Transaction
+    suspend fun clearEntireOwnerWarehouse(ownerId: String) {
+        require(ownerId.isNotBlank())
+        clearOutbox(ownerId)
+        clearSyncCursor(ownerId)
+        clearOwnerTombstones(ownerId)
+        clearOwnerConflictDecisions(ownerId)
+        clearOwnerRestoreStaging(ownerId)
+        clearOwnerRestoreJournals(ownerId)
+        clearOwnerWeeklyBackupJournals(ownerId)
+        clearMovements(ownerId)
+        clearParts(ownerId)
+    }
+
     @Query("DELETE FROM parts WHERE code = :code AND ownerId = :ownerId")
     suspend fun deletePartRow(ownerId: String, code: String)
 
