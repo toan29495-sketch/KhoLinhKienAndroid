@@ -51,12 +51,12 @@ internal object RestoreRpcJson {
         var current = value
         repeat(4) {
             if (current !is JsonPrimitive || current.isString.not() && current.content.trim().let {
-                    !(it.startsWith("{") || it.startsWith("[") || it.startsWith("\\\""))
+                    !(it.startsWith("{") || it.startsWith("[") || it.startsWith(34.toChar().toString()))
                 }) return current
 
             val text = current.content.trim()
             val looksLikeJsonContainer = text.startsWith("{") || text.startsWith("[")
-            val looksLikeQuotedJson = text.startsWith("\\\"")
+            val looksLikeQuotedJson = text.startsWith(34.toChar().toString())
             if (!looksLikeJsonContainer && !looksLikeQuotedJson) return current
 
             val next = runCatching { parser.parseToJsonElement(text) }
