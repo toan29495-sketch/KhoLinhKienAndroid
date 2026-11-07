@@ -98,3 +98,11 @@ The original SQL files were absent from the Step203 ZIP. The live catalog was in
 ### Step204/205 advisor snapshot (2026-11-04)
 - Security advisor: six RLS-enabled/no-policy tables (including the internal audit/guard tables and restore/sync staging tables); 20 authenticated-executable `SECURITY DEFINER` functions; leaked-password protection disabled. No setting or grant was changed during this audit.
 - Performance advisor: two unindexed foreign keys on `admin_audit_events` (`actor_id`, `target_user_id`) and six currently unused indexes. No indexes were added or removed.
+
+
+## Step220 — Owner-scoped warehouse wipe (2026-11-07)
+- Applied active migration 20261107100000_owner_scoped_warehouse_wipe. It adds the authenticated SECURITY DEFINER RPC purge_my_inventory_data(), whose deletion predicate is always auth.uid(); it preserves profiles/auth.users, app_admins and admin audit history.
+- Applied active migration 20261107101500_warehouse_wipe_mutation_fence. It adds private table inventory_warehouse_wipes, blocks INSERT/UPDATE on eight owner-scoped inventory/sync/restore/backup tables while a wipe is pending, and exposes finish_my_inventory_wipe() to release the fence only after cleanup.
+- Live read-only verification: both RPC signatures exist, the wipe-lock table exists, and eight named mutation guard triggers are installed.
+- Edge Function purge-own-warehouse is ACTIVE version 2 with verify_jwt=true. It validates the caller token/profile, calls the database purge with the caller JWT, uses service-role Storage API only to remove objects under the caller's UUID folder in part-images and inventory-backups, then calls finish_my_inventory_wipe(). A failed Storage cleanup leaves the mutation fence in place so the same account can retry.
+- No production warehouse rows, Storage objects, backup records, user profiles or Auth accounts were deleted while implementing/deploying these server-side capabilities. Actual wipe behavior remains untested and must be tested only with a disposable owner account.
