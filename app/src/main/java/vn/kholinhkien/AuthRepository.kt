@@ -50,6 +50,12 @@ class AuthRepository {
         return if (parts.size == 2) "${parts[0]}+${parts[1]}@gmail.com" else "$normalized@gmail.com"
     }
 
+    /** Restore the persisted Supabase session before any profile request. */
+    suspend fun restoreSessionFromStorage(): Boolean = client.auth.loadFromStorage()
+
+    /** Stop refresh while backgrounded; ON_START reloads the persisted session. */
+    fun stopSessionAutoRefresh() = client.auth.stopAutoRefreshForCurrentSession()
+
     suspend fun signIn(username: String, password: String) {
         client.auth.signInWith(Email) {
             email = usernameToEmail(username)
