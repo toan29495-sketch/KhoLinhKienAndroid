@@ -20,7 +20,7 @@ as $$
 begin
   if exists (
     select 1 from public.inventory_warehouse_wipes w
-    where w.owner_id = coalesce(new.owner_id, old.owner_id)
+    where w.owner_id = new.owner_id
   ) then
     raise exception 'WAREHOUSE_WIPE_IN_PROGRESS' using errcode = '55000';
   end if;
