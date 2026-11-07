@@ -57,7 +57,11 @@ jobs:
         run: |
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_PUBLISHABLE_KEY"
-          printf 'SUPABASE_URL=%s\\nSUPABASE_PUBLISHABLE_KEY=%s\\n' "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+          {
+            printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL"
+            printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY"
+          } > local.properties
+          cat local.properties
 
       - name: Build signed Release APK
         env:
