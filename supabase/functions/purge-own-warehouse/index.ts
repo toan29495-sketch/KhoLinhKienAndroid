@@ -81,15 +81,18 @@ Deno.serve(async (req: Request) => {
       return json(403, { success: false, error: "Tài khoản không hoạt động hoặc chưa đổi mật khẩu bắt buộc" });
     }
 
+    // First commit the owner-bound database purge. If Storage cleanup later
+    // fails, the request can be retried: the SQL RPC is idempotent and the
+    // remaining objects are still discoverable under this owner's folders.
+    // The RPC uses the caller JWT so auth.uid() remains the exact account whose
+    // password was reauthenticated by Android; never use service role here.
+    const { data: purgeResult, error: purgeError } = await caller.rpc("purge_my_inventory_data");
+    if (purgeError) throw new Error(`Không thể xóa dữ liệu kho trên Cloud: ${purgeError.message}`);
+
     // Storage API (service role) is used instead of direct DELETE on storage.objects.
     // Both buckets are traversed only below the caller's UUID folder.
     const imageCount = await removeOwnerObjects(admin, "part-images", authData.user.id);
     const backupCount = await removeOwnerObjects(admin, "inventory-backups", authData.user.id);
-
-    // The RPC uses the caller JWT so auth.uid() remains the exact account whose
-    // password was reauthenticated by the Android app; never use service role here.
-    const { data: purgeResult, error: purgeError } = await caller.rpc("purge_my_inventory_data");
-    if (purgeError) throw new Error(`Đã xóa ${imageCount} ảnh và ${backupCount} backup Storage nhưng chưa xóa dữ liệu kho: ${purgeError.message}`);
     return json(200, { success: true, image_objects_deleted: imageCount, backup_objects_deleted: backupCount, purge: purgeResult });
   } catch (error) {
     return json(500, { success: false, error: error instanceof Error ? error.message : "Không thể xóa kho" });
