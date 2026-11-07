@@ -69,7 +69,7 @@ class SyncOutboxSender(
                 // Never acknowledge/apply an RPC response after the shared Supabase
                 // client has switched to another account during the request.
                 requireActiveOwner(ownerId)
-                val responseObject = Json.parseToJsonElement(rpcResponse.toString()).jsonObject
+                val responseObject = RestoreRpcJson.objectValue(rpcResponse.data, "apply_inventory_operation")
                 // A transport success alone is not enough to acknowledge an outbox row:
                 // validate that the cached/applied RPC result belongs to this exact part.
                 val responseStatus = responseObject["status"]?.let { (it as? JsonPrimitive)?.contentOrNull }
