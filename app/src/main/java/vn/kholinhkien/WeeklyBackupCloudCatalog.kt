@@ -48,7 +48,7 @@ internal class WeeklyBackupCloudCatalog(
         val raw = client.postgrest.rpc("list_my_inventory_backups")
         // Parse the complete response atomically. A malformed row must not result
         // in a partial catalog that could hide a newer or conflicting backup.
-        val rows = RestoreRpcJson.arrayValue(raw, "list_my_inventory_backups").mapIndexed { index, row ->
+        val rows = RestoreRpcJson.arrayValue(raw.data, "list_my_inventory_backups").mapIndexed { index, row ->
             val item = row as? JsonObject
                 ?: error("RPC list_my_inventory_backups: dòng $index không phải JSON object")
             parseEntry(item, ownerId)
