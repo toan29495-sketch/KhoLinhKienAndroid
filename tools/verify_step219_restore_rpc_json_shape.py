@@ -11,7 +11,7 @@ catalog = (SRC / "WeeklyBackupCloudCatalog.kt").read_text(encoding="utf-8")
 
 checks = {
     "shared RPC parser accepts JsonElement directly": "is JsonElement -> raw" in helper,
-    "shared RPC parser unwraps JSON string primitive": "value !is JsonPrimitive || !value.isString" in helper and "parser.parseToJsonElement(trimmed)" in helper,
+    "shared RPC parser unwraps raw JsonLiteral and quoted JSON primitive": "if (value !is JsonPrimitive) return value" in helper and "parser.parseToJsonElement(trimmed)" in helper,
     "object parser rejects non-object with diagnostic": "as? JsonObject" in helper and "cần JSON object" in helper,
     "array parser rejects non-array with diagnostic": "as? JsonArray" in helper and "cần JSON array" in helper,
     "commit response uses normalized parser": 'RestoreRpcJson.objectValue(raw, "commit_inventory_restore")' in committer,
