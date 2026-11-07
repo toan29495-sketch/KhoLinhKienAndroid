@@ -93,7 +93,17 @@ Deno.serve(async (req: Request) => {
     // Both buckets are traversed only below the caller's UUID folder.
     const imageCount = await removeOwnerObjects(admin, "part-images", authData.user.id);
     const backupCount = await removeOwnerObjects(admin, "inventory-backups", authData.user.id);
-    return json(200, { success: true, image_objects_deleted: imageCount, backup_objects_deleted: backupCount, purge: purgeResult });
+
+    // Release the server-side mutation fence only after both owner folders are empty.
+    const { data: finishResult, error: finishError } = await caller.rpc("finish_my_inventory_wipe");
+    if (finishError) throw new Error(`Đã dọn Storage nhưng chưa thể mở lại thao tác kho: ${finishError.message}`);
+    return json(200, {
+      success: true,
+      image_objects_deleted: imageCount,
+      backup_objects_deleted: backupCount,
+      purge: purgeResult,
+      finish: finishResult,
+    });
   } catch (error) {
     return json(500, { success: false, error: error instanceof Error ? error.message : "Không thể xóa kho" });
   }
