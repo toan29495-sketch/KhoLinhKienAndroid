@@ -1782,3 +1782,12 @@
 - Giới hạn: cần build và kiểm thử trên chính thiết bị để xác nhận; bản sửa hiện là source-level hardening, chưa chứng minh đã khắc phục nguyên nhân crash gốc vì bugreport thiếu stack trace. Không thay đổi Supabase, dữ liệu server hoặc signing config.
 
 - Follow-up audit: device package metadata confirms installed `versionCode=17`, `versionName=1.16`; corrected next release metadata to `18` / `1.17` so the update can install without uninstalling. Added version monotonicity assertions to Step214 verifier. This correction does not prove the original crash root cause.
+
+## Step219 — Normalize Supabase restore RPC JSON response shapes (07/11/2026)
+- Tiếp tục từ nhánh đầy đủ `test/step214-v1.17`; tạo nhánh riêng `fix/step219-restore-rpc-json-shape`, không sửa nhánh nền.
+- Điều tra lỗi thiết bị `Element class kotlinx.serialization.json.JsonLiteral is not a JsonObject` xuất hiện ở trạng thái `STAGED` và `COMMIT_UNKNOWN`. Source có các RPC response parser gọi `.jsonObject` trực tiếp sau `Json.parseToJsonElement(raw.toString())`, tại commit restore và đọc/xác minh snapshot; đây là các điểm có thể ném chính xác lỗi kiểu này khi SDK trả JSON string primitive bọc nội dung JSON.
+- Thêm `RestoreRpcJson.kt`: chuẩn hóa phản hồi RPC từ `JsonElement`, chuỗi JSON hoặc JSON string primitive chứa object/array; chỉ unwrap một lớp có chủ đích; từ chối scalar/shape sai với lỗi nêu tên RPC và kiểu thực tế.
+- Chuyển `RestoreCloudCommitter` và `RestoreCloudSnapshotReader` sang parser dùng chung; payload snapshot được kiểm tra `JsonArray` bằng safe cast. Chuyển `WeeklyBackupCloudCatalog` sang array parser dùng chung và kiểm tra từng row là `JsonObject` trước khi parse.
+- Không thay đổi thứ tự commit, restoreId, idempotency, journal status, staging buckets, dữ liệu Room đang hoạt động, Supabase schema/RLS/Storage/Auth hoặc dữ liệu server. `COMMIT_UNKNOWN` vẫn giữ nguyên để retry đúng restoreId; không tạo phiên mới.
+- Thêm `tools/verify_step219_restore_rpc_json_shape.py`: 11/11 PASS. Backup/restore regression sweep: 53/53 PASS. `python -m compileall -q tools`: PASS.
+- Gradle compile đã thử: wrapper tải Gradle 8.9 nhưng môi trường không phân giải được `services.gradle.org` (`UnknownHostException`); chưa Kotlin compile, APK build hoặc test HONOR. Chưa gọi RPC Supabase live; source-level fix chưa được coi là runtime verified.
