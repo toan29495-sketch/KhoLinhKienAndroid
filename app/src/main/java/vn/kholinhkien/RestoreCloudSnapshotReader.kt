@@ -6,13 +6,10 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
@@ -102,7 +99,7 @@ internal class RestoreCloudSnapshotReader(
                 }
             )
             requireActiveOwner(ownerId)
-            val envelope = Json.parseToJsonElement(raw.toString()).jsonObject
+            val envelope = RestoreRpcJson.objectValue(raw, "read_inventory_restore_snapshot_chunk")
             require(envelope["restore_id"]?.jsonPrimitive?.contentOrNull == restoreId) { "Snapshot trả sai restoreId" }
             require(envelope["manifest_sha256"]?.jsonPrimitive?.contentOrNull.equals(journal.manifestSha256, true)) { "Snapshot manifest không khớp" }
             require(envelope["snapshot_cursor"]?.jsonPrimitive?.longOrNull == journal.snapshotCursor) { "Snapshot cursor thay đổi giữa các chunk" }
@@ -111,7 +108,8 @@ internal class RestoreCloudSnapshotReader(
             require(envelope["chunk_count"]?.jsonPrimitive?.intOrNull == chunkCount) { "Số chunk snapshot không khớp payload đã commit" }
             val md5 = envelope["payload_md5"]?.jsonPrimitive?.contentOrNull
             require(md5 != null && md5.matches(Regex("^[a-fA-F0-9]{32}$"))) { "Snapshot thiếu checksum MD5 hợp lệ" }
-            val payload = envelope["payload"]?.jsonArray ?: error("Snapshot thiếu payload")
+            val payload = envelope["payload"] as? kotlinx.serialization.json.JsonArray
+                ?: error("Snapshot thiếu payload JSON array")
             val rowCount = envelope["row_count"]?.jsonPrimitive?.intOrNull
             require(rowCount == payload.size && payload.isNotEmpty() && payload.size <= 200) { "Số dòng snapshot không hợp lệ" }
 
@@ -130,7 +128,7 @@ internal class RestoreCloudSnapshotReader(
                 }
             )
             requireActiveOwner(ownerId)
-            val verification = Json.parseToJsonElement(verificationRaw.toString()).jsonObject
+            val verification = RestoreRpcJson.objectValue(verificationRaw, "verify_inventory_restore_snapshot_chunk")
             require(verification["verified"]?.jsonPrimitive?.contentOrNull == "true") {
                 "Checksum snapshot không khớp dữ liệu máy chủ ở chunk $index"
             }
