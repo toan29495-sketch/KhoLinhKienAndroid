@@ -536,20 +536,37 @@ fun InventoryApp() {
         }
     }
     var pendingPhotoPath by remember(profile.id) { mutableStateOf("") }
-    // Camera preview trả Bitmap trực tiếp; không tạo ảnh trong thư viện MediaStore.
-    val cameraCapture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) {
-            try {
-                val dir = ownerPendingPhotoDirectory(context, profile.id).apply { mkdirs() }
-                val file = File(dir, "pending_${java.util.UUID.randomUUID()}.jpg")
-                FileOutputStream(file).use { out -> check(bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)) }
-                pendingPhotoPath = file.absolutePath
-                // Success is shown inline by the selected photo preview; no modal popup.
-                message = ""
-            } catch (e: Exception) { message = "Không lưu được ảnh chờ đồng bộ: ${e.message}" }
+    var capturePhotoFile by remember(profile.id) { mutableStateOf<File?>(null) }
+    // Capture full-resolution JPEG directly into app-private storage. No preview Bitmap
+    // and no recompression: the exact camera output is later uploaded to Supabase.
+    val cameraCapture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val file = capturePhotoFile
+        capturePhotoFile = null
+        if (success && file != null && file.isFile && file.length() > 0L) {
+            pendingPhotoPath = file.absolutePath
+            message = ""
+        } else {
+            file?.delete()
+            message = "Không chụp được ảnh. Vui lòng thử lại."
         }
     }
-    val takePhoto: () -> Unit = { cameraCapture.launch(null) }
+    val takePhoto: () -> Unit = {
+        try {
+            val dir = ownerPendingPhotoDirectory(context, profile.id).apply { mkdirs() }
+            val file = File(dir, "capture_${java.util.UUID.randomUUID()}.jpg")
+            capturePhotoFile = file
+            val captureUri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            cameraCapture.launch(captureUri)
+        } catch (e: Exception) {
+            capturePhotoFile?.delete()
+            capturePhotoFile = null
+            message = "Không thể mở camera: ${e.message}"
+        }
+    }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             try { pendingPhotoPath = copyImageToPrivateStorage(context, uri, profile.id) }
