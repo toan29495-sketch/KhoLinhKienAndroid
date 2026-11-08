@@ -1280,41 +1280,71 @@ private fun PartDialog(
 @Composable
 private fun PartPhotoPreview(photoPath: String, ownerId: String) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var bitmap by remember(photoPath, ownerId) { mutableStateOf<Bitmap?>(null) }
     var status by remember(photoPath, ownerId) { mutableStateOf("Đang tải ảnh…") }
+    var saving by remember(photoPath, ownerId) { mutableStateOf(false) }
+    var showFullScreen by remember(photoPath, ownerId) { mutableStateOf(false) }
+
+    val savePhoto: () -> Unit = {
+        if (!saving && photoPath.isNotBlank()) {
+            scope.launch {
+                saving = true
+                try {
+                    val imageBytes = readPartPhotoBytes(context, photoPath, ownerId)
+                    try {
+                        val savedUri = withContext(Dispatchers.IO) {
+                            val format = detectPartPhotoFormat(imageBytes)
+                            val name = "PIMS_${System.currentTimeMillis()}.${format.second}"
+                            val values = ContentValues().apply {
+                                put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                                put(MediaStore.Images.Media.MIME_TYPE, format.first)
+                                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/PIMS")
+                                put(MediaStore.Images.Media.IS_PENDING, 1)
+                            }
+                            val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                                ?: error("Không tạo được tệp trong thư viện ảnh")
+                            try {
+                                context.contentResolver.openOutputStream(uri)?.use { output -> output.write(imageBytes); output.flush() }
+                                    ?: error("Không mở được tệp để ghi")
+                                val published = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
+                                context.contentResolver.update(uri, published, null, null)
+                                uri
+                            } catch (error: Exception) {
+                                context.contentResolver.delete(uri, null, null)
+                                throw error
+                            }
+                        }
+                        android.widget.Toast.makeText(context, "Đã lưu ảnh vào Pictures/PIMS", android.widget.Toast.LENGTH_LONG).show()
+                    } finally {
+                        imageBytes.fill(0)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    android.widget.Toast.makeText(context, "Không lưu được ảnh: ${error.message ?: "lỗi không xác định"}", android.widget.Toast.LENGTH_LONG).show()
+                } finally {
+                    saving = false
+                }
+            }
+        }
+    }
+
     LaunchedEffect(photoPath, ownerId) {
         bitmap = null
         if (photoPath.isBlank()) return@LaunchedEffect
         try {
-            val decoded = withContext(Dispatchers.IO) {
-                val imageBytes = if (File(photoPath).isAbsolute) {
-                    val source = File(photoPath)
-                    val canonicalSource = source.canonicalFile
-                    val privateRoot = context.filesDir.canonicalFile
-                    require(canonicalSource.path.startsWith(privateRoot.path + File.separator)) { "Ảnh cục bộ nằm ngoài vùng dữ liệu ứng dụng" }
-                    val pendingRoot = File(privateRoot, "pending_part_photos").canonicalFile
-                    if (canonicalSource.path.startsWith(pendingRoot.path + File.separator)) {
-                        require(canonicalSource.parentFile == File(pendingRoot, ownerId).canonicalFile) { "Ảnh chờ đồng bộ không thuộc tài khoản đang đăng nhập" }
-                    }
-                    require(source.isFile) { "Ảnh cục bộ không còn tồn tại" }
-                    readPhotoBytesBounded(source)
-                } else {
-                    require(!photoPath.startsWith('/') && !photoPath.contains('\\')) { "Đường dẫn ảnh không hợp lệ" }
-                    val segments = photoPath.split('/')
-                    require(segments.size >= 2 && segments.first() == ownerId && segments.none { it.isBlank() || it == "." || it == ".." }) { "Ảnh không thuộc tài khoản đang đăng nhập" }
-                    SupabaseClientProvider.client.storage.from("part-images").downloadAuthenticated(photoPath)
-                        .also { require(it.size in 1..MAX_PART_PHOTO_BYTES) { "Ảnh cloud rỗng hoặc vượt giới hạn 20 MB" } }
-                }
-                try {
-                    require(imageBytes.size in 1..MAX_PART_PHOTO_BYTES) { "Ảnh rỗng hoặc vượt giới hạn 20 MB" }
+            val imageBytes = readPartPhotoBytes(context, photoPath, ownerId)
+            val decoded = try {
+                withContext(Dispatchers.IO) {
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
                     require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Tệp ảnh không đọc được" }
                     var sample = 1
                     while (bounds.outWidth / sample > 1200 || bounds.outHeight / sample > 1200) sample *= 2
                     BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-                } finally { imageBytes.fill(0) }
-            }
+                }
+            } finally { imageBytes.fill(0) }
             bitmap = decoded
             status = if (decoded == null) "Không giải mã được ảnh" else ""
         } catch (cancelled: CancellationException) {
@@ -1323,12 +1353,115 @@ private fun PartPhotoPreview(photoPath: String, ownerId: String) {
             status = "Không tải được ảnh: ${error.message ?: "lỗi không xác định"}"
         }
     }
+
     if (bitmap != null) {
-        Image(bitmap!!.asImageBitmap(), contentDescription = "Ảnh linh kiện ${photoPath.substringAfterLast('/').take(40)}", modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp))
-    } else if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Image(
+                bitmap!!.asImageBitmap(),
+                contentDescription = "Mở ảnh linh kiện toàn màn hình",
+                modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).clickable { showFullScreen = true }
+            )
+            OutlinedButton(onClick = savePhoto, enabled = !saving, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Download, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (saving) "Đang lưu ảnh…" else "Lưu ảnh về máy")
+            }
+        }
+        if (showFullScreen) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showFullScreen = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.92f).padding(12.dp),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ảnh linh kiện", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            IconButton(onClick = savePhoto, enabled = !saving) {
+                                Icon(Icons.Default.Download, contentDescription = "Lưu ảnh về máy")
+                            }
+                            IconButton(onClick = { showFullScreen = false }) {
+                                Icon(Icons.Default.Close, contentDescription = "Đóng ảnh")
+                            }
+                        }
+                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Image(
+                                bitmap!!.asImageBitmap(),
+                                contentDescription = "Ảnh linh kiện toàn màn hình",
+                                modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                            )
+                        }
+                        Button(onClick = savePhoto, enabled = !saving, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Download, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (saving) "Đang lưu ảnh…" else "Lưu ảnh về máy")
+                        }
+                    }
+                }
+            }
+        }
+    } else if (status.isNotBlank()) {
+        Text(status, style = MaterialTheme.typography.bodySmall)
+    }
 }
 
 private const val MAX_PART_PHOTO_BYTES = 20 * 1024 * 1024
+
+private suspend fun readPartPhotoBytes(
+    context: android.content.Context,
+    photoPath: String,
+    ownerId: String
+): ByteArray = withContext(Dispatchers.IO) {
+    val imageBytes = if (File(photoPath).isAbsolute) {
+        val source = File(photoPath)
+        val canonicalSource = source.canonicalFile
+        val privateRoot = context.filesDir.canonicalFile
+        require(canonicalSource.path.startsWith(privateRoot.path + File.separator)) {
+            "Ảnh cục bộ nằm ngoài vùng dữ liệu ứng dụng"
+        }
+        val pendingRoot = File(privateRoot, "pending_part_photos").canonicalFile
+        if (canonicalSource.path.startsWith(pendingRoot.path + File.separator)) {
+            require(canonicalSource.parentFile == File(pendingRoot, ownerId).canonicalFile) {
+                "Ảnh chờ đồng bộ không thuộc tài khoản đang đăng nhập"
+            }
+        }
+        require(source.isFile) { "Ảnh cục bộ không còn tồn tại" }
+        readPhotoBytesBounded(source)
+    } else {
+        require(!photoPath.startsWith('/') && !photoPath.contains('\\')) { "Đường dẫn ảnh không hợp lệ" }
+        val segments = photoPath.split('/')
+        require(segments.size >= 2 && segments.first() == ownerId &&
+            segments.none { it.isBlank() || it == "." || it == ".." }) {
+            "Ảnh không thuộc tài khoản đang đăng nhập"
+        }
+        SupabaseClientProvider.client.storage.from("part-images").downloadAuthenticated(photoPath)
+    }
+    require(imageBytes.size in 1..MAX_PART_PHOTO_BYTES) { "Ảnh rỗng hoặc vượt giới hạn 20 MB" }
+    imageBytes
+}
+
+private fun detectPartPhotoFormat(bytes: ByteArray): Pair<String, String> {
+    require(bytes.size >= 12) { "Tệp ảnh không hợp lệ" }
+    return when {
+        bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() ->
+            "image/jpeg" to "jpg"
+        bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() &&
+            bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte() ->
+            "image/png" to "png"
+        bytes.copyOfRange(0, 4).decodeToString() == "GIF8" ->
+            "image/gif" to "gif"
+        bytes.copyOfRange(0, 4).decodeToString() == "RIFF" &&
+            bytes.copyOfRange(8, 12).decodeToString() == "WEBP" ->
+            "image/webp" to "webp"
+        else -> error("Định dạng ảnh không được hỗ trợ")
+    }
+}
 
 private fun readPhotoBytesBounded(file: File): ByteArray {
     require(file.length() in 1..MAX_PART_PHOTO_BYTES.toLong()) { "Ảnh cục bộ rỗng hoặc vượt giới hạn 20 MB" }
