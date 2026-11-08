@@ -10,6 +10,7 @@ import android.net.Uri
 import android.util.JsonReader
 import android.util.JsonToken
 import android.os.Bundle
+import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1300,15 +1301,19 @@ private fun PartPhotoPreview(photoPath: String, ownerId: String) {
                                 put(MediaStore.Images.Media.DISPLAY_NAME, name)
                                 put(MediaStore.Images.Media.MIME_TYPE, format.first)
                                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/PIMS")
-                                put(MediaStore.Images.Media.IS_PENDING, 1)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                                }
                             }
                             val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                                 ?: error("Không tạo được tệp trong thư viện ảnh")
                             try {
                                 context.contentResolver.openOutputStream(uri)?.use { output -> output.write(imageBytes); output.flush() }
                                     ?: error("Không mở được tệp để ghi")
-                                val published = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
-                                context.contentResolver.update(uri, published, null, null)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    val published = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
+                                    context.contentResolver.update(uri, published, null, null)
+                                }
                                 uri
                             } catch (error: Exception) {
                                 context.contentResolver.delete(uri, null, null)
